@@ -79,16 +79,31 @@ func (m *SessionManager) Start() error {
 		return nil
 	}
 
-	// Auto-connect servers with connect_on_start=true
-	// Each client uses unique OS/Browser properties to avoid Discord rate limits
+	// Collect servers to auto-connect
+	var toConnect []config.ServerEntry
 	for _, server := range cfg.Servers {
 		if server.ConnectOnStart {
-			go func(s config.ServerEntry) {
+			toConnect = append(toConnect, server)
+		}
+	}
+
+	// Auto-connect with staggered delays to avoid Discord rate limits
+	// Discord limits IDENTIFY to ~1 per 5 seconds per token
+	// Initial delay allows old container sessions to close during rolling deploys
+	if len(toConnect) > 0 {
+		go func() {
+			// Wait for old container to fully stop (rolling deploy overlap)
+			time.Sleep(5 * time.Second)
+
+			for i, s := range toConnect {
+				if i > 0 {
+					time.Sleep(2 * time.Second)
+				}
 				if err := m.Join(s.ID); err != nil {
 					m.logger.Error("Failed to auto-connect", "server_id", s.ID, "error", err)
 				}
-			}(server)
-		}
+			}
+		}()
 	}
 
 	return nil
