@@ -36,11 +36,12 @@ var (
 
 // Client represents a Discord Gateway WebSocket client.
 type Client struct {
-	token string
+	token  string
+	status string // Presence status (online, idle, dnd)
 
-	conn   *websocket.Conn
-	state  int
-	mu     sync.RWMutex
+	conn  *websocket.Conn
+	state int
+	mu    sync.RWMutex
 
 	// Session state
 	sessionID string
@@ -54,8 +55,8 @@ type Client struct {
 	heartbeatStop     chan struct{}
 
 	// Message handling
-	readStop  chan struct{}
-	readDone  chan struct{}
+	readStop chan struct{}
+	readDone chan struct{}
 
 	// Status callbacks
 	OnReady       func(sessionID string)
@@ -73,9 +74,17 @@ func NewClient(token string, logger *slog.Logger) *Client {
 	}
 	return &Client{
 		token:  token,
+		status: "online", // Default status
 		state:  StateDisconnected,
 		logger: logger.With("component", "gateway"),
 	}
+}
+
+// SetStatus sets the presence status to use when connecting.
+func (c *Client) SetStatus(status string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.status = status
 }
 
 // Connect establishes a connection to the Discord Gateway.
@@ -151,7 +160,13 @@ func (c *Client) Close() error {
 
 // SendIdentify sends the IDENTIFY payload to Discord.
 func (c *Client) SendIdentify(ctx context.Context) error {
-	return c.SendIdentifyWithStatus(ctx, "online")
+	c.mu.RLock()
+	status := c.status
+	c.mu.RUnlock()
+	if status == "" {
+		status = "online"
+	}
+	return c.SendIdentifyWithStatus(ctx, status)
 }
 
 // SendIdentifyWithStatus sends the IDENTIFY payload with a specific status.

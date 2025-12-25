@@ -293,8 +293,20 @@ func (m *SessionManager) runSession(session *Session) {
 		session.state.MarkConnecting()
 		m.notifyStatusChange(serverID, StatusConnecting, "Connecting...")
 
+		// Load config to get global status
+		cfg, err := m.store.Load()
+		if err != nil {
+			m.logger.Error("Failed to load config", "error", err)
+			return
+		}
+		status := string(cfg.Status)
+		if status == "" {
+			status = "online"
+		}
+
 		// Create Gateway client
 		client := gateway.NewClient(m.token, m.logger)
+		client.SetStatus(status)
 		session.client = client
 
 		// Set up callbacks
@@ -302,15 +314,10 @@ func (m *SessionManager) runSession(session *Session) {
 			session.state.MarkConnected(sessionID)
 			m.notifyStatusChange(serverID, StatusConnected, "Connected")
 
-			// Send presence update
-			ctx, cancel := context.WithTimeout(session.ctx, 5*time.Second)
-			client.SendPresenceUpdate(ctx, string(session.serverEntry.Status))
-			cancel()
-
-			// Join voice channel if configured
+			// Join voice channel if configured (presence is already set in IDENTIFY)
 			if session.serverEntry.ChannelID != "" {
 				ctx, cancel := context.WithTimeout(session.ctx, 5*time.Second)
-				client.SendVoiceStateUpdate(ctx, session.serverEntry.GuildID, session.serverEntry.ChannelID, false, false)
+				client.SendVoiceStateUpdate(ctx, session.serverEntry.GuildID, session.serverEntry.ChannelID, true, true)
 				cancel()
 			}
 		}

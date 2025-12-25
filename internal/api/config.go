@@ -56,6 +56,7 @@ func (h *ConfigHandler) ReplaceConfig(w http.ResponseWriter, r *http.Request) {
 
 	var input struct {
 		Servers []config.ServerEntry `json:"servers"`
+		Status  config.Status        `json:"status,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -90,6 +91,11 @@ func (h *ConfigHandler) ReplaceConfig(w http.ResponseWriter, r *http.Request) {
 	// Replace servers
 	cfg.Servers = input.Servers
 
+	// Update global status if provided
+	if input.Status != "" {
+		cfg.Status = input.Status
+	}
+
 	// Save config
 	if err := h.store.Save(cfg); err != nil {
 		h.logger.Error("Failed to save config", "error", err)
@@ -117,6 +123,7 @@ func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 
 	var input struct {
 		Servers []config.ServerEntry `json:"servers"`
+		Status  config.Status        `json:"status,omitempty"`
 	}
 
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
@@ -154,9 +161,6 @@ func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 			if update.ChannelID != "" {
 				existing.ChannelID = update.ChannelID
 			}
-			if update.Status != "" {
-				existing.Status = update.Status
-			}
 			existing.ConnectOnStart = update.ConnectOnStart
 			if update.Priority > 0 {
 				existing.Priority = update.Priority
@@ -173,6 +177,11 @@ func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	cfg.Servers = make([]config.ServerEntry, 0, len(serverMap))
 	for _, s := range serverMap {
 		cfg.Servers = append(cfg.Servers, *s)
+	}
+
+	// Update global status if provided
+	if input.Status != "" {
+		cfg.Status = input.Status
 	}
 
 	// Validate server count after merge

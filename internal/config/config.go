@@ -21,9 +21,6 @@ type ServerEntry struct {
 	// ChannelID is the Discord voice channel ID (snowflake)
 	ChannelID string `json:"channel_id"`
 
-	// Status is the desired presence status: online, idle, or dnd
-	Status Status `json:"status"`
-
 	// ConnectOnStart determines if this connection should auto-connect when service starts
 	ConnectOnStart bool `json:"connect_on_start"`
 
@@ -35,6 +32,9 @@ type ServerEntry struct {
 type Configuration struct {
 	// Servers is the list of configured server entries (max 15)
 	Servers []ServerEntry `json:"servers"`
+
+	// Status is the global presence status for the account (online, idle, dnd)
+	Status Status `json:"status"`
 
 	// TOSAcknowledged indicates the user has acknowledged the TOS warning
 	TOSAcknowledged bool `json:"tos_acknowledged"`
@@ -54,9 +54,6 @@ func (s *ServerEntry) Validate() error {
 	if s.ChannelID == "" {
 		return ErrEmptyChannelID
 	}
-	if s.Status != StatusOnline && s.Status != StatusIdle && s.Status != StatusDND {
-		return ErrInvalidStatus
-	}
 	if s.Priority < 1 {
 		return ErrInvalidPriority
 	}
@@ -67,6 +64,10 @@ func (s *ServerEntry) Validate() error {
 func (c *Configuration) Validate() error {
 	if len(c.Servers) > MaxServerEntries {
 		return ErrTooManyServers
+	}
+	// Validate status (allow empty for backwards compatibility, defaults to online)
+	if c.Status != "" && c.Status != StatusOnline && c.Status != StatusIdle && c.Status != StatusDND {
+		return ErrInvalidStatus
 	}
 	for i := range c.Servers {
 		if err := c.Servers[i].Validate(); err != nil {
@@ -80,6 +81,7 @@ func (c *Configuration) Validate() error {
 func Default() *Configuration {
 	return &Configuration{
 		Servers:         []ServerEntry{},
+		Status:          StatusOnline,
 		TOSAcknowledged: false,
 	}
 }

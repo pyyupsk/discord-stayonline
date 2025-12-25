@@ -31,6 +31,9 @@ func TestConfigStoreLoadSave(t *testing.T) {
 		if cfg.TOSAcknowledged {
 			t.Error("expected TOSAcknowledged to be false")
 		}
+		if cfg.Status != config.StatusOnline {
+			t.Errorf("expected default status 'online', got '%s'", cfg.Status)
+		}
 	})
 
 	// Test save and load roundtrip
@@ -41,7 +44,6 @@ func TestConfigStoreLoadSave(t *testing.T) {
 					ID:             "test-1",
 					GuildID:        "123456789012345678",
 					ChannelID:      "234567890123456789",
-					Status:         config.StatusOnline,
 					ConnectOnStart: true,
 					Priority:       1,
 				},
@@ -49,11 +51,11 @@ func TestConfigStoreLoadSave(t *testing.T) {
 					ID:             "test-2",
 					GuildID:        "987654321098765432",
 					ChannelID:      "876543210987654321",
-					Status:         config.StatusIdle,
 					ConnectOnStart: false,
 					Priority:       2,
 				},
 			},
+			Status:          config.StatusIdle,
 			TOSAcknowledged: true,
 		}
 
@@ -72,6 +74,9 @@ func TestConfigStoreLoadSave(t *testing.T) {
 		if !loaded.TOSAcknowledged {
 			t.Error("expected TOSAcknowledged to be true")
 		}
+		if loaded.Status != config.StatusIdle {
+			t.Errorf("expected status 'idle', got '%s'", loaded.Status)
+		}
 
 		// Verify first server
 		if loaded.Servers[0].ID != "test-1" {
@@ -79,9 +84,6 @@ func TestConfigStoreLoadSave(t *testing.T) {
 		}
 		if loaded.Servers[0].GuildID != "123456789012345678" {
 			t.Errorf("expected guild ID '123456789012345678', got '%s'", loaded.Servers[0].GuildID)
-		}
-		if loaded.Servers[0].Status != config.StatusOnline {
-			t.Errorf("expected status 'online', got '%s'", loaded.Servers[0].Status)
 		}
 	})
 
@@ -154,6 +156,7 @@ func TestConfigStoreSaveValidation(t *testing.T) {
 	t.Run("save fails with too many servers", func(t *testing.T) {
 		cfg := &config.Configuration{
 			Servers: make([]config.ServerEntry, 16), // One more than max
+			Status:  config.StatusOnline,
 		}
 		// Fill with valid entries
 		for i := range cfg.Servers {
@@ -161,7 +164,6 @@ func TestConfigStoreSaveValidation(t *testing.T) {
 				ID:             "test-" + string(rune('A'+i)),
 				GuildID:        "123456789012345678",
 				ChannelID:      "234567890123456789",
-				Status:         config.StatusOnline,
 				ConnectOnStart: true,
 				Priority:       1,
 			}
@@ -181,15 +183,28 @@ func TestConfigStoreSaveValidation(t *testing.T) {
 					ID:        "",
 					GuildID:   "123456789012345678",
 					ChannelID: "234567890123456789",
-					Status:    config.StatusOnline,
 					Priority:  1,
 				},
 			},
+			Status: config.StatusOnline,
 		}
 
 		err := store.Save(cfg)
 		if err != config.ErrEmptyID {
 			t.Errorf("expected ErrEmptyID, got %v", err)
+		}
+	})
+
+	// Test saving config with invalid status
+	t.Run("save fails with invalid status", func(t *testing.T) {
+		cfg := &config.Configuration{
+			Servers: []config.ServerEntry{},
+			Status:  "invalid",
+		}
+
+		err := store.Save(cfg)
+		if err != config.ErrInvalidStatus {
+			t.Errorf("expected ErrInvalidStatus, got %v", err)
 		}
 	})
 }
@@ -206,7 +221,6 @@ func TestServerEntryValidation(t *testing.T) {
 				ID:             "test-1",
 				GuildID:        "123456789012345678",
 				ChannelID:      "234567890123456789",
-				Status:         config.StatusOnline,
 				ConnectOnStart: true,
 				Priority:       1,
 			},
@@ -218,7 +232,6 @@ func TestServerEntryValidation(t *testing.T) {
 				ID:        "",
 				GuildID:   "123456789012345678",
 				ChannelID: "234567890123456789",
-				Status:    config.StatusOnline,
 				Priority:  1,
 			},
 			wantErr: config.ErrEmptyID,
@@ -229,7 +242,6 @@ func TestServerEntryValidation(t *testing.T) {
 				ID:        "test-1",
 				GuildID:   "",
 				ChannelID: "234567890123456789",
-				Status:    config.StatusOnline,
 				Priority:  1,
 			},
 			wantErr: config.ErrEmptyGuildID,
@@ -240,21 +252,9 @@ func TestServerEntryValidation(t *testing.T) {
 				ID:        "test-1",
 				GuildID:   "123456789012345678",
 				ChannelID: "",
-				Status:    config.StatusOnline,
 				Priority:  1,
 			},
 			wantErr: config.ErrEmptyChannelID,
-		},
-		{
-			name: "invalid status",
-			entry: config.ServerEntry{
-				ID:        "test-1",
-				GuildID:   "123456789012345678",
-				ChannelID: "234567890123456789",
-				Status:    "invalid",
-				Priority:  1,
-			},
-			wantErr: config.ErrInvalidStatus,
 		},
 		{
 			name: "zero priority",
@@ -262,7 +262,6 @@ func TestServerEntryValidation(t *testing.T) {
 				ID:        "test-1",
 				GuildID:   "123456789012345678",
 				ChannelID: "234567890123456789",
-				Status:    config.StatusOnline,
 				Priority:  0,
 			},
 			wantErr: config.ErrInvalidPriority,
@@ -273,32 +272,9 @@ func TestServerEntryValidation(t *testing.T) {
 				ID:        "test-1",
 				GuildID:   "123456789012345678",
 				ChannelID: "234567890123456789",
-				Status:    config.StatusOnline,
 				Priority:  -1,
 			},
 			wantErr: config.ErrInvalidPriority,
-		},
-		{
-			name: "idle status is valid",
-			entry: config.ServerEntry{
-				ID:        "test-1",
-				GuildID:   "123456789012345678",
-				ChannelID: "234567890123456789",
-				Status:    config.StatusIdle,
-				Priority:  1,
-			},
-			wantErr: nil,
-		},
-		{
-			name: "dnd status is valid",
-			entry: config.ServerEntry{
-				ID:        "test-1",
-				GuildID:   "123456789012345678",
-				ChannelID: "234567890123456789",
-				Status:    config.StatusDND,
-				Priority:  1,
-			},
-			wantErr: nil,
 		},
 	}
 
@@ -319,11 +295,11 @@ func TestConfigurationJSONFormat(t *testing.T) {
 				ID:             "test-1",
 				GuildID:        "123456789012345678",
 				ChannelID:      "234567890123456789",
-				Status:         config.StatusOnline,
 				ConnectOnStart: true,
 				Priority:       1,
 			},
 		},
+		Status:          config.StatusOnline,
 		TOSAcknowledged: true,
 	}
 
@@ -337,10 +313,10 @@ func TestConfigurationJSONFormat(t *testing.T) {
 	expectedFields := []string{
 		`"servers"`,
 		`"tos_acknowledged"`,
+		`"status"`,
 		`"id"`,
 		`"guild_id"`,
 		`"channel_id"`,
-		`"status"`,
 		`"connect_on_start"`,
 		`"priority"`,
 	}
