@@ -29,3 +29,5 @@ services:
     - go.sum
     - Dockerfile
     - Makefile
+    ignoredPaths:
+    - "**/*_test.go"

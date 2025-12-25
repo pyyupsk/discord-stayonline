@@ -81,7 +81,13 @@ Dockerfile
 Makefile
 ```
 
-Only changes to source code, dependencies, and build files will trigger new builds. Documentation and config changes are ignored.
+And add **Ignored Paths** to skip test files:
+
+```txt
+**/*_test.go
+```
+
+Only changes to source code, dependencies, and build files will trigger new builds. Documentation, config, and test file changes are ignored.
 
 ## Important Notes
 
