@@ -222,4 +222,3 @@ func (h *DiscordHandler) GetBulkServerInfo(w http.ResponseWriter, r *http.Reques
 
 	writeJSON(w, http.StatusOK, results)
 }
-

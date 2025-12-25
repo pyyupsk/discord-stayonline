@@ -8,9 +8,9 @@ import (
 
 // Reconnector manages automatic reconnection with exponential backoff.
 type Reconnector struct {
-	client  *Client
-	token   string
-	logger  *slog.Logger
+	client *Client
+	token  string
+	logger *slog.Logger
 
 	attempt    int
 	maxAttempt int

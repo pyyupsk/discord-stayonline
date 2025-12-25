@@ -7,10 +7,10 @@ import (
 
 func TestCalculateBackoff(t *testing.T) {
 	tests := []struct {
-		name          string
-		attempt       int
-		wantMinDelay  time.Duration
-		wantMaxDelay  time.Duration
+		name         string
+		attempt      int
+		wantMinDelay time.Duration
+		wantMaxDelay time.Duration
 	}{
 		{
 			name:         "first attempt (0) should be around 1s",

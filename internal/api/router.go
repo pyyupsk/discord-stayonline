@@ -15,7 +15,7 @@ import (
 // Router sets up HTTP routes for the API.
 type Router struct {
 	mux     *http.ServeMux
-	store   *config.Store
+	store   config.ConfigStore
 	manager *manager.SessionManager
 	hub     *ws.Hub
 	webFS   fs.FS
@@ -24,7 +24,7 @@ type Router struct {
 }
 
 // NewRouter creates a new API router.
-func NewRouter(store *config.Store, mgr *manager.SessionManager, hub *ws.Hub, webFS fs.FS, logger *slog.Logger) *Router {
+func NewRouter(store config.ConfigStore, mgr *manager.SessionManager, hub *ws.Hub, webFS fs.FS, logger *slog.Logger) *Router {
 	if logger == nil {
 		logger = slog.Default()
 	}

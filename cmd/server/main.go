@@ -44,12 +44,27 @@ func main() {
 		port = "8080"
 	}
 
-	// Initialize ConfigStore
-	configPath := os.Getenv("CONFIG_PATH")
-	if configPath == "" {
-		configPath = "config.json"
+	// Initialize ConfigStore (use PostgreSQL if DATABASE_URL is set, otherwise file)
+	var store config.ConfigStore
+	var dbStore *config.DBStore
+
+	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
+		slog.Info("Using PostgreSQL for configuration storage")
+		var err error
+		dbStore, err = config.NewDBStore(databaseURL)
+		if err != nil {
+			slog.Error("Failed to connect to database", "error", err)
+			os.Exit(1)
+		}
+		store = dbStore
+	} else {
+		slog.Info("Using file for configuration storage")
+		configPath := os.Getenv("CONFIG_PATH")
+		if configPath == "" {
+			configPath = "config.json"
+		}
+		store = config.NewStore(configPath)
 	}
-	store := config.NewStore(configPath)
 
 	// Load existing config or create default
 	cfg, err := store.Load()
@@ -123,6 +138,11 @@ func main() {
 
 	// Close WebSocket hub
 	hub.Close()
+
+	// Close database connection if using PostgreSQL
+	if dbStore != nil {
+		dbStore.Close()
+	}
 
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("Server forced to shutdown", "error", err)

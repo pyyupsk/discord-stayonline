@@ -10,12 +10,12 @@ import (
 
 // ConfigHandler handles configuration API requests.
 type ConfigHandler struct {
-	store  *config.Store
+	store  config.ConfigStore
 	logger *slog.Logger
 }
 
 // NewConfigHandler creates a new config handler.
-func NewConfigHandler(store *config.Store, logger *slog.Logger) *ConfigHandler {
+func NewConfigHandler(store config.ConfigStore, logger *slog.Logger) *ConfigHandler {
 	if logger == nil {
 		logger = slog.Default()
 	}

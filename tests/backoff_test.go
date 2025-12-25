@@ -145,26 +145,26 @@ func TestCalculateBackoffCapAt60Seconds(t *testing.T) {
 
 func TestIsFatalCloseCode(t *testing.T) {
 	tests := []struct {
-		code     int
+		code      int
 		wantFatal bool
 	}{
 		{gateway.CloseUnknownError, false},
 		{gateway.CloseUnknownOpcode, false},
 		{gateway.CloseDecodeError, false},
 		{gateway.CloseNotAuthenticated, false},
-		{gateway.CloseAuthenticationFailed, true},  // FATAL
+		{gateway.CloseAuthenticationFailed, true}, // FATAL
 		{gateway.CloseAlreadyAuthenticated, false},
 		{gateway.CloseInvalidSeq, false},
 		{gateway.CloseRateLimited, false},
 		{gateway.CloseSessionTimedOut, false},
-		{gateway.CloseInvalidShard, true},          // FATAL
-		{gateway.CloseShardingRequired, true},      // FATAL
-		{gateway.CloseInvalidAPIVersion, true},     // FATAL
-		{gateway.CloseInvalidIntents, true},        // FATAL
-		{gateway.CloseDisallowedIntents, true},     // FATAL
-		{1000, false},                              // Normal closure
-		{1001, false},                              // Going away
-		{0, false},                                 // Unknown
+		{gateway.CloseInvalidShard, true},      // FATAL
+		{gateway.CloseShardingRequired, true},  // FATAL
+		{gateway.CloseInvalidAPIVersion, true}, // FATAL
+		{gateway.CloseInvalidIntents, true},    // FATAL
+		{gateway.CloseDisallowedIntents, true}, // FATAL
+		{1000, false},                          // Normal closure
+		{1001, false},                          // Going away
+		{0, false},                             // Unknown
 	}
 
 	for _, tt := range tests {

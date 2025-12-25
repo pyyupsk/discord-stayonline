@@ -6,17 +6,17 @@ import "encoding/json"
 // Gateway opcodes as defined by Discord.
 // See: https://discord.com/developers/docs/topics/opcodes-and-status-codes#gateway-opcodes
 const (
-	OpDispatch        = 0  // Dispatch: An event was dispatched (S→C)
-	OpHeartbeat       = 1  // Heartbeat: Fired periodically to keep connection alive (C→S)
-	OpIdentify        = 2  // Identify: Starts a new session (C→S)
-	OpPresenceUpdate  = 3  // Presence Update: Update client's presence (C→S)
+	OpDispatch         = 0  // Dispatch: An event was dispatched (S→C)
+	OpHeartbeat        = 1  // Heartbeat: Fired periodically to keep connection alive (C→S)
+	OpIdentify         = 2  // Identify: Starts a new session (C→S)
+	OpPresenceUpdate   = 3  // Presence Update: Update client's presence (C→S)
 	OpVoiceStateUpdate = 4  // Voice State Update: Join/leave voice channel (C→S)
-	OpResume          = 6  // Resume: Resume a previous session (C→S)
-	OpReconnect       = 7  // Reconnect: Server requests client reconnect (S→C)
-	OpRequestMembers  = 8  // Request Guild Members: Request guild members (C→S)
-	OpInvalidSession  = 9  // Invalid Session: Session invalidated (S→C)
-	OpHello           = 10 // Hello: Sent after connecting, contains heartbeat interval (S→C)
-	OpHeartbeatAck    = 11 // Heartbeat ACK: Sent in response to receiving heartbeat (S→C)
+	OpResume           = 6  // Resume: Resume a previous session (C→S)
+	OpReconnect        = 7  // Reconnect: Server requests client reconnect (S→C)
+	OpRequestMembers   = 8  // Request Guild Members: Request guild members (C→S)
+	OpInvalidSession   = 9  // Invalid Session: Session invalidated (S→C)
+	OpHello            = 10 // Hello: Sent after connecting, contains heartbeat interval (S→C)
+	OpHeartbeatAck     = 11 // Heartbeat ACK: Sent in response to receiving heartbeat (S→C)
 )
 
 // Gateway close codes.
@@ -55,10 +55,10 @@ func IsFatalCloseCode(code int) bool {
 
 // GatewayMessage represents a generic Gateway protocol message.
 type GatewayMessage struct {
-	Op       int              `json:"op"`          // Opcode for the payload
-	Data     json.RawMessage  `json:"d"`           // Event data (varies by opcode)
-	Sequence *int             `json:"s,omitempty"` // Sequence number (dispatch only)
-	Type     string           `json:"t,omitempty"` // Event name (dispatch only)
+	Op       int             `json:"op"`          // Opcode for the payload
+	Data     json.RawMessage `json:"d"`           // Event data (varies by opcode)
+	Sequence *int            `json:"s,omitempty"` // Sequence number (dispatch only)
+	Type     string          `json:"t,omitempty"` // Event name (dispatch only)
 }
 
 // HelloData is the payload for OP 10 (Hello).
@@ -93,10 +93,10 @@ type IdentifyProperties struct {
 // PresenceData is the payload for OP 3 (Presence Update).
 // MANUAL REVIEW: Verify status values are valid Discord presence states.
 type PresenceData struct {
-	Since      *int64      `json:"since"`      // Unix time in ms of when the client went idle, null if not idle
-	Activities []Activity  `json:"activities"` // Array of activity objects
-	Status     string      `json:"status"`     // Status: online, dnd, idle, invisible, offline
-	AFK        bool        `json:"afk"`        // Whether the client is AFK
+	Since      *int64     `json:"since"`      // Unix time in ms of when the client went idle, null if not idle
+	Activities []Activity `json:"activities"` // Array of activity objects
+	Status     string     `json:"status"`     // Status: online, dnd, idle, invisible, offline
+	AFK        bool       `json:"afk"`        // Whether the client is AFK
 }
 
 // Activity represents a Discord activity (game, streaming, etc).
@@ -108,10 +108,10 @@ type Activity struct {
 // VoiceStateData is the payload for OP 4 (Voice State Update).
 // MANUAL REVIEW: Verify guild_id and channel_id are correct snowflake formats.
 type VoiceStateData struct {
-	GuildID   string  `json:"guild_id"`            // ID of the guild
-	ChannelID *string `json:"channel_id"`          // ID of the voice channel to join (null to disconnect)
-	SelfMute  bool    `json:"self_mute"`           // Is the client muted
-	SelfDeaf  bool    `json:"self_deaf"`           // Is the client deafened
+	GuildID   string  `json:"guild_id"`   // ID of the guild
+	ChannelID *string `json:"channel_id"` // ID of the voice channel to join (null to disconnect)
+	SelfMute  bool    `json:"self_mute"`  // Is the client muted
+	SelfDeaf  bool    `json:"self_deaf"`  // Is the client deafened
 }
 
 // ResumeData is the payload for OP 6 (Resume).

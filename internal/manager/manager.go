@@ -14,18 +14,18 @@ import (
 
 // Common errors
 var (
-	ErrServerNotFound    = errors.New("server not found")
+	ErrServerNotFound     = errors.New("server not found")
 	ErrTooManyConnections = errors.New("maximum 15 connections allowed")
 	ErrTOSNotAcknowledged = errors.New("TOS not acknowledged")
-	ErrAlreadyConnected  = errors.New("already connected")
-	ErrNotConnected      = errors.New("not connected")
+	ErrAlreadyConnected   = errors.New("already connected")
+	ErrNotConnected       = errors.New("not connected")
 )
 
 // SessionManager manages multiple Gateway connections.
 type SessionManager struct {
-	token    string
-	store    *config.Store
-	logger   *slog.Logger
+	token  string
+	store  config.ConfigStore
+	logger *slog.Logger
 
 	sessions map[string]*Session
 	mu       sync.RWMutex
@@ -51,7 +51,7 @@ type Session struct {
 }
 
 // NewSessionManager creates a new session manager.
-func NewSessionManager(token string, store *config.Store, logger *slog.Logger) *SessionManager {
+func NewSessionManager(token string, store config.ConfigStore, logger *slog.Logger) *SessionManager {
 	if logger == nil {
 		logger = slog.Default()
 	}

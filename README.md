@@ -61,12 +61,24 @@ docker run -d \
 
 ## Environment Variables
 
-| Variable          | Required | Default     | Description                                   |
-| ----------------- | -------- | ----------- | --------------------------------------------- |
-| `DISCORD_TOKEN`   | Yes      | -           | Your Discord user token                       |
-| `API_KEY`         | No       | -           | API key for web UI authentication             |
-| `PORT`            | No       | `8080`      | HTTP server port                              |
-| `ALLOWED_ORIGINS` | No       | `localhost` | Comma-separated allowed origins for WebSocket |
+| Variable          | Required | Default       | Description                                       |
+| ----------------- | -------- | ------------- | ------------------------------------------------- |
+| `DISCORD_TOKEN`   | Yes      | -             | Your Discord user token                           |
+| `DATABASE_URL`    | No       | -             | PostgreSQL connection URL (for persistent config) |
+| `API_KEY`         | No       | -             | API key for web UI authentication                 |
+| `PORT`            | No       | `8080`        | HTTP server port                                  |
+| `CONFIG_PATH`     | No       | `config.json` | Path to config file (if not using DATABASE_URL)   |
+| `ALLOWED_ORIGINS` | No       | `localhost`   | Comma-separated allowed origins for WebSocket     |
+
+### PostgreSQL Storage (Recommended for cloud deployments)
+
+Set `DATABASE_URL` to use PostgreSQL for config storage instead of a file. This is recommended for platforms like Render where the filesystem is ephemeral.
+
+```bash
+DATABASE_URL=postgres://user:password@host:5432/dbname
+```
+
+The app auto-creates the required table on startup.
 
 ### Authentication
 

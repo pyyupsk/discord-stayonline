@@ -11,12 +11,12 @@ import (
 
 // TOSHandler handles TOS acknowledgment requests.
 type TOSHandler struct {
-	store  *config.Store
+	store  config.ConfigStore
 	logger *slog.Logger
 }
 
 // NewTOSHandler creates a new TOS handler.
-func NewTOSHandler(store *config.Store, logger *slog.Logger) *TOSHandler {
+func NewTOSHandler(store config.ConfigStore, logger *slog.Logger) *TOSHandler {
 	if logger == nil {
 		logger = slog.Default()
 	}
