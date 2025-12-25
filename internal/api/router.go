@@ -80,6 +80,12 @@ func (r *Router) Setup() http.Handler {
 	r.mux.HandleFunc("GET /api/discord/server-info", r.auth.Protect(discordHandler.GetServerInfo))
 	r.mux.HandleFunc("POST /api/discord/bulk-info", r.auth.Protect(discordHandler.GetBulkServerInfo))
 
+	// Logs handler (protected)
+	if r.hub != nil {
+		logsHandler := NewLogsHandler(r.hub, r.logger)
+		r.mux.HandleFunc("GET /api/logs", r.auth.Protect(logsHandler.GetLogs))
+	}
+
 	// WebSocket handler (protected via middleware wrapper)
 	if r.hub != nil {
 		allowedOrigins := os.Getenv("ALLOWED_ORIGINS")

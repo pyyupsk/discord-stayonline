@@ -1,4 +1,4 @@
-import { ref, onUnmounted } from "vue";
+import { ref, computed, onUnmounted } from "vue";
 import type {
   ConnectionStatus,
   LogEntry,
@@ -7,13 +7,14 @@ import type {
 } from "@/types";
 
 const MAX_RECONNECT_ATTEMPTS = 10;
-const MAX_LOG_ENTRIES = 100;
+const MAX_LOG_ENTRIES = 500;
 
 const wsStatus = ref<"connected" | "connecting" | "disconnected" | "error">(
   "disconnected",
 );
 const serverStatuses = ref<Map<string, ConnectionStatus>>(new Map());
 const logs = ref<LogEntry[]>([]);
+const logFilter = ref<LogEntry["level"] | "all">("all");
 
 let ws: WebSocket | null = null;
 let reconnectAttempt = 0;
@@ -33,6 +34,13 @@ function disconnect() {
 export function useWebSocket() {
   let onConfigChanged: ((config: Configuration) => void) | null = null;
 
+  const filteredLogs = computed(() => {
+    if (logFilter.value === "all") {
+      return logs.value;
+    }
+    return logs.value.filter((log) => log.level === logFilter.value);
+  });
+
   async function loadStatuses() {
     try {
       const response = await fetch("/api/statuses");
@@ -44,6 +52,40 @@ export function useWebSocket() {
       }
     } catch {
       // Silently fail - will get updates via WebSocket
+    }
+  }
+
+  async function loadLogs() {
+    try {
+      const response = await fetch("/api/logs");
+      if (!response.ok) return;
+
+      const serverLogs: Array<{
+        level: LogEntry["level"];
+        message: string;
+        timestamp: string;
+      }> = await response.json();
+
+      // Convert server logs to frontend format and prepend to existing logs
+      const existingMessages = new Set(logs.value.map((l) => l.message));
+      for (const log of serverLogs) {
+        // Avoid duplicates
+        if (!existingMessages.has(log.message)) {
+          logs.value.push({
+            time: new Date(log.timestamp),
+            level: log.level,
+            message: log.message,
+          });
+        }
+      }
+
+      // Sort by time and keep only recent entries
+      logs.value.sort((a, b) => a.time.getTime() - b.time.getTime());
+      if (logs.value.length > MAX_LOG_ENTRIES) {
+        logs.value = logs.value.slice(-MAX_LOG_ENTRIES);
+      }
+    } catch {
+      // Silently fail
     }
   }
 
@@ -65,8 +107,9 @@ export function useWebSocket() {
 
         ws?.send(JSON.stringify({ type: "subscribe", channel: "logs" }));
 
-        // Load current statuses after connecting
+        // Load current statuses and logs after connecting
         loadStatuses();
+        loadLogs();
       };
 
       ws.onclose = () => {
@@ -169,16 +212,24 @@ export function useWebSocket() {
     disconnect();
   });
 
+  function setLogFilter(filter: LogEntry["level"] | "all") {
+    logFilter.value = filter;
+  }
+
   return {
     wsStatus,
     serverStatuses,
     logs,
+    filteredLogs,
+    logFilter,
     connect,
     disconnect,
     loadStatuses,
+    loadLogs,
     addLog,
     clearLogs,
     getServerStatus,
     setOnConfigChanged,
+    setLogFilter,
   };
 }

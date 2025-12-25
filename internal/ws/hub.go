@@ -98,6 +98,16 @@ func NewErrorMessage(code, message, serverID string) *ErrorMessage {
 	}
 }
 
+// LogEntry represents a stored log entry.
+type LogEntry struct {
+	Level     LogLevel  `json:"level"`
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// MaxLogEntries is the maximum number of log entries to store.
+const MaxLogEntries = 500
+
 // Hub manages WebSocket client connections and message broadcasting.
 type Hub struct {
 	clients    map[*Client]bool
@@ -106,6 +116,10 @@ type Hub struct {
 	unregister chan *Client
 	mu         sync.RWMutex
 	logger     *slog.Logger
+
+	// Log storage
+	logs   []LogEntry
+	logsMu sync.RWMutex
 }
 
 // NewHub creates a new WebSocket hub.
@@ -119,6 +133,7 @@ func NewHub(logger *slog.Logger) *Hub {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		logger:     logger.With("component", "ws-hub"),
+		logs:       make([]LogEntry, 0, MaxLogEntries),
 	}
 }
 
@@ -181,9 +196,17 @@ func (h *Hub) BroadcastStatus(serverID, status, message string) {
 	h.Broadcast(data)
 }
 
-// BroadcastLog sends a log message to subscribed clients.
+// BroadcastLog sends a log message to subscribed clients and stores it.
 func (h *Hub) BroadcastLog(level LogLevel, message string) {
 	logMsg := NewLogMessage(level, message)
+
+	// Store log entry
+	h.storeLog(LogEntry{
+		Level:     level,
+		Message:   message,
+		Timestamp: logMsg.Timestamp,
+	})
+
 	data, err := json.Marshal(logMsg)
 	if err != nil {
 		h.logger.Error("Failed to marshal log message", "error", err)
@@ -197,6 +220,41 @@ func (h *Hub) BroadcastLog(level LogLevel, message string) {
 		}
 	}
 	h.mu.RUnlock()
+}
+
+// storeLog adds a log entry to the storage, removing oldest if at capacity.
+func (h *Hub) storeLog(entry LogEntry) {
+	h.logsMu.Lock()
+	defer h.logsMu.Unlock()
+
+	if len(h.logs) >= MaxLogEntries {
+		// Remove oldest entries (keep last MaxLogEntries-1)
+		h.logs = h.logs[1:]
+	}
+	h.logs = append(h.logs, entry)
+}
+
+// GetLogs returns stored log entries, optionally filtered by level.
+// If level is empty, returns all logs.
+func (h *Hub) GetLogs(level string) []LogEntry {
+	h.logsMu.RLock()
+	defer h.logsMu.RUnlock()
+
+	if level == "" {
+		// Return a copy
+		result := make([]LogEntry, len(h.logs))
+		copy(result, h.logs)
+		return result
+	}
+
+	// Filter by level
+	var result []LogEntry
+	for _, log := range h.logs {
+		if string(log.Level) == level {
+			result = append(result, log)
+		}
+	}
+	return result
 }
 
 // BroadcastError sends an error message to all clients.

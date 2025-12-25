@@ -30,12 +30,14 @@ const {
 } = useConfig();
 const {
   wsStatus,
-  logs,
+  filteredLogs,
+  logFilter,
   connect,
   clearLogs,
   getServerStatus,
   setOnConfigChanged,
   addLog,
+  setLogFilter,
 } = useWebSocket();
 const { joinServer, rejoinServer, exitServer, isLoading } = useServers();
 const {
@@ -269,7 +271,12 @@ async function handleExit(server: ServerEntry) {
 
         <!-- Activity Log -->
         <section>
-          <ActivityLog :logs="logs" @clear="clearLogs" />
+          <ActivityLog
+            :logs="filteredLogs"
+            :filter="logFilter"
+            @clear="clearLogs"
+            @update:filter="setLogFilter"
+          />
         </section>
       </main>
     </div>

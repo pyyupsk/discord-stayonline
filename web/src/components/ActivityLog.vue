@@ -4,13 +4,24 @@ import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-vue-next";
 import type { LogEntry } from "@/types";
 
+type LogFilter = LogEntry["level"] | "all";
+
 const props = defineProps<{
   logs: LogEntry[];
+  filter: LogFilter;
 }>();
 
 const emit = defineEmits<{
   clear: [];
+  "update:filter": [value: LogFilter];
 }>();
+
+const filterOptions: { value: LogFilter; label: string }[] = [
+  { value: "all", label: "All" },
+  { value: "info", label: "Info" },
+  { value: "warn", label: "Warn" },
+  { value: "error", label: "Error" },
+];
 
 function formatTime(date: Date): string {
   return date.toLocaleTimeString();
@@ -34,15 +45,28 @@ function getLevelClass(level: LogEntry["level"]): string {
   <div class="flex flex-col gap-2">
     <div class="flex items-center justify-between">
       <h3 class="text-sm font-medium">Activity Log</h3>
-      <Button
-        variant="ghost"
-        size="sm"
-        class="h-7 px-2 text-xs"
-        @click="emit('clear')"
-      >
-        <Trash2 />
-        Clear
-      </Button>
+      <div class="flex items-center gap-1">
+        <div class="flex rounded-md border">
+          <Button
+            v-for="option in filterOptions"
+            :key="option.value"
+            :variant="filter === option.value ? 'secondary' : 'ghost'"
+            size="sm"
+            class="h-7 rounded-none px-2 text-xs first:rounded-l-md last:rounded-r-md"
+            @click="emit('update:filter', option.value)"
+          >
+            {{ option.label }}
+          </Button>
+        </div>
+        <Button
+          variant="ghost"
+          size="sm"
+          class="h-7 px-2 text-xs"
+          @click="emit('clear')"
+        >
+          <Trash2 />
+        </Button>
+      </div>
     </div>
 
     <ScrollArea class="h-48 rounded-md border bg-muted/30 p-3">
