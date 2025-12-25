@@ -202,7 +202,7 @@ func (c *Client) Close() error {
 
 	c.state = StateClosed
 
-	// Stop heartbeat
+	// Stop heartbeat (may already be closed by readLoop)
 	if c.heartbeatStop != nil {
 		close(c.heartbeatStop)
 		c.heartbeatStop = nil
@@ -213,6 +213,9 @@ func (c *Client) Close() error {
 		close(c.readStop)
 		c.readStop = nil
 	}
+
+	// Clear disconnected channel (may already be closed by readLoop)
+	c.disconnected = nil
 
 	// Close WebSocket first to unblock any pending reads
 	conn := c.conn
@@ -433,8 +436,13 @@ func (c *Client) SendVoiceStateUpdate(ctx context.Context, guildID, channelID st
 func (c *Client) readLoop(ctx context.Context) {
 	defer func() {
 		close(c.readDone)
-		// Signal external listeners that connection ended
+		// Stop heartbeat goroutine when read loop ends
 		c.mu.Lock()
+		if c.heartbeatStop != nil {
+			close(c.heartbeatStop)
+			c.heartbeatStop = nil
+		}
+		// Signal external listeners that connection ended
 		if c.disconnected != nil {
 			close(c.disconnected)
 			c.disconnected = nil
