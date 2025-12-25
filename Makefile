@@ -24,7 +24,7 @@ start: build
 # Build for production
 build:
 	@echo "Building..."
-	@cd web && npm install && npm run build
+	@cd web && bun install && bun run build
 	@mkdir -p $(BUILD_DIR)
 	go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/server
 	@echo "Done! Binary: $(BUILD_DIR)/$(BINARY_NAME)"
@@ -38,9 +38,9 @@ lint:
 	golangci-lint run
 
 # Format code
-fmt:
+format:
 	go fmt ./...
-	@cd web && npm run lint 2>/dev/null || true
+	@cd web && bun run lint 2>/dev/null || true
 
 # Clean build artifacts
 clean:
@@ -54,15 +54,15 @@ clean:
 
 # Run web dev server with hot reload
 web-dev:
-	cd web && npm run dev
+	cd web && bun run dev
 
 # Build web UI only
 web-build:
-	cd web && npm install && npm run build
+	cd web && bun install && bun run build
 
 # Install web dependencies
 web-install:
-	cd web && npm install
+	cd web && bun install
 
 # ============================================================================
 # Docker Commands
@@ -128,7 +128,7 @@ check-size:
 # Install all dependencies
 install:
 	go mod download
-	cd web && npm install
+	cd web && bun install
 	@echo "Dependencies installed!"
 
 # Install dev tools

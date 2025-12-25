@@ -1,15 +1,15 @@
 # Web build stage
-FROM node:22-alpine AS web-builder
+FROM oven/bun:1-alpine AS web-builder
 
 WORKDIR /app/web
 
 # Copy web package files
-COPY web/package*.json ./
-RUN npm ci
+COPY web/package.json web/bun.lock ./
+RUN bun install --frozen-lockfile
 
 # Copy web source and build
 COPY web/ ./
-RUN npm run build
+RUN bun run build
 
 # Go build stage
 FROM golang:1.23-alpine AS builder
