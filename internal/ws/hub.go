@@ -3,6 +3,7 @@ package ws
 
 import (
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
@@ -185,7 +186,7 @@ func (h *Hub) Broadcast(data []byte) {
 	}
 }
 
-// BroadcastStatus sends a status update to all clients.
+// BroadcastStatus sends a status update to all clients and stores it.
 func (h *Hub) BroadcastStatus(serverID, status, message string) {
 	update := NewStatusUpdate(serverID, status, message)
 	data, err := json.Marshal(update)
@@ -194,6 +195,14 @@ func (h *Hub) BroadcastStatus(serverID, status, message string) {
 		return
 	}
 	h.Broadcast(data)
+
+	// Store status update as log entry
+	if h.logStore != nil && message != "" {
+		logMsg := fmt.Sprintf("[%s] %s", serverID, message)
+		if err := h.logStore.AddLog("info", logMsg); err != nil {
+			h.logger.Error("Failed to store status log entry", "error", err)
+		}
+	}
 }
 
 // BroadcastLog sends a log message to subscribed clients and stores it.
