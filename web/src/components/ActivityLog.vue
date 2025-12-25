@@ -46,15 +46,14 @@ function getLevelClass(level: LogEntry["level"]): string {
     </div>
 
     <ScrollArea class="h-48 rounded-md border bg-muted/30 p-3">
-      <div v-if="logs.length === 0" class="text-center text-sm text-muted-foreground">
+      <div
+        v-if="logs.length === 0"
+        class="text-center text-sm text-muted-foreground"
+      >
         No activity yet
       </div>
       <div v-else class="space-y-1 font-mono text-xs">
-        <div
-          v-for="(log, index) in logs"
-          :key="index"
-          class="flex gap-2"
-        >
+        <div v-for="(log, index) in logs" :key="index" class="flex gap-2">
           <span class="text-muted-foreground">{{ formatTime(log.time) }}</span>
           <span :class="getLevelClass(log.level)" class="uppercase">
             [{{ log.level }}]

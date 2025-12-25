@@ -6,8 +6,12 @@ const actionLoading = ref<Map<string, boolean>>(new Map());
 export function useServers() {
   async function executeAction(
     serverId: string,
-    action: "join" | "rejoin" | "exit"
-  ): Promise<{ success: boolean; newStatus?: ConnectionStatus; error?: string }> {
+    action: "join" | "rejoin" | "exit",
+  ): Promise<{
+    success: boolean;
+    newStatus?: ConnectionStatus;
+    error?: string;
+  }> {
     actionLoading.value.set(serverId, true);
 
     try {

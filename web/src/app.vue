@@ -16,8 +16,25 @@ import { useWebSocket } from "@/composables/useWebSocket";
 import { useServers } from "@/composables/useServers";
 import type { ServerEntry, Status } from "@/types";
 
-const { config, loadConfig, updateStatus, acknowledgeTos, addServer, updateServer, deleteServer, setConfig } = useConfig();
-const { wsStatus, logs, connect, clearLogs, getServerStatus, setOnConfigChanged, addLog } = useWebSocket();
+const {
+  config,
+  loadConfig,
+  updateStatus,
+  acknowledgeTos,
+  addServer,
+  updateServer,
+  deleteServer,
+  setConfig,
+} = useConfig();
+const {
+  wsStatus,
+  logs,
+  connect,
+  clearLogs,
+  getServerStatus,
+  setOnConfigChanged,
+  addLog,
+} = useWebSocket();
 const { joinServer, rejoinServer, exitServer, isLoading } = useServers();
 
 const showServerForm = ref(false);
@@ -64,7 +81,9 @@ function handleEditServer(server: ServerEntry) {
   showServerForm.value = true;
 }
 
-async function handleSaveServer(server: Omit<ServerEntry, "id"> & { id?: string }) {
+async function handleSaveServer(
+  server: Omit<ServerEntry, "id"> & { id?: string },
+) {
   let success: boolean;
 
   if (server.id) {
@@ -127,7 +146,9 @@ async function handleExit(server: ServerEntry) {
   <div v-if="config.tos_acknowledged" class="min-h-screen bg-background">
     <!-- Header -->
     <header class="border-b">
-      <div class="container mx-auto flex items-center justify-between px-4 py-4">
+      <div
+        class="container mx-auto flex items-center justify-between px-4 py-4"
+      >
         <h1 class="text-xl font-semibold">Discord Stay Online</h1>
         <Badge :variant="isConnected ? 'default' : 'secondary'" class="gap-1">
           <component :is="isConnected ? Wifi : WifiOff" class="h-3 w-3" />
@@ -140,10 +161,7 @@ async function handleExit(server: ServerEntry) {
     <main class="container mx-auto space-y-6 px-4 py-6">
       <!-- Global Status -->
       <section class="flex items-center justify-between">
-        <GlobalStatus
-          :status="config.status"
-          @change="handleStatusChange"
-        />
+        <GlobalStatus :status="config.status" @change="handleStatusChange" />
       </section>
 
       <Separator />
@@ -152,14 +170,23 @@ async function handleExit(server: ServerEntry) {
       <section class="space-y-4">
         <div class="flex items-center justify-between">
           <h2 class="text-lg font-medium">Server Connections</h2>
-          <Button size="sm" @click="handleAddServer" :disabled="config.servers.length >= 15">
+          <Button
+            size="sm"
+            @click="handleAddServer"
+            :disabled="config.servers.length >= 15"
+          >
             <Plus class="mr-1 h-4 w-4" />
             Add Server
           </Button>
         </div>
 
-        <div v-if="config.servers.length === 0" class="rounded-lg border border-dashed p-8 text-center">
-          <p class="text-muted-foreground">No servers configured. Click "Add Server" to get started.</p>
+        <div
+          v-if="config.servers.length === 0"
+          class="rounded-lg border border-dashed p-8 text-center"
+        >
+          <p class="text-muted-foreground">
+            No servers configured. Click "Add Server" to get started.
+          </p>
         </div>
 
         <div v-else class="space-y-3">

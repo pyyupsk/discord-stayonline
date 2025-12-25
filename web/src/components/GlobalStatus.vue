@@ -36,7 +36,11 @@ function handleChange(value: unknown) {
     <Label for="status" class="text-muted-foreground whitespace-nowrap">
       Account Status
     </Label>
-    <Select :modelValue="props.status" @update:modelValue="handleChange" :disabled="props.disabled">
+    <Select
+      :modelValue="props.status"
+      @update:modelValue="handleChange"
+      :disabled="props.disabled"
+    >
       <SelectTrigger id="status" class="w-[160px]">
         <SelectValue placeholder="Select status" />
       </SelectTrigger>

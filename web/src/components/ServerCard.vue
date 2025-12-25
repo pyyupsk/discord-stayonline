@@ -60,7 +60,7 @@ const channelDisplay = computed(() => {
 
 <template>
   <Card>
-    <CardContent class="flex items-center justify-between gap-4 p-4">
+    <CardContent class="flex items-center justify-between gap-4">
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
           <span class="font-medium">{{ displayName }}</span>
@@ -77,7 +77,9 @@ const channelDisplay = computed(() => {
         <Button
           variant="outline"
           size="icon"
-          :disabled="loading || status === 'connected' || status === 'connecting'"
+          :disabled="
+            loading || status === 'connected' || status === 'connecting'
+          "
           @click="emit('join')"
           title="Join"
         >
@@ -101,12 +103,7 @@ const channelDisplay = computed(() => {
         >
           <Square class="h-4 w-4" />
         </Button>
-        <Button
-          variant="ghost"
-          size="icon"
-          @click="emit('edit')"
-          title="Edit"
-        >
+        <Button variant="ghost" size="icon" @click="emit('edit')" title="Edit">
           <Pencil class="h-4 w-4" />
         </Button>
         <Button

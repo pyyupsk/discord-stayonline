@@ -40,7 +40,7 @@ watch(
       channelId.value = "";
       connectOnStart.value = true;
     }
-  }
+  },
 );
 
 const isEdit = () => !!props.server;
@@ -68,7 +68,11 @@ function handleClose() {
       <DialogHeader>
         <DialogTitle>{{ isEdit() ? "Edit Server" : "Add Server" }}</DialogTitle>
         <DialogDescription>
-          {{ isEdit() ? "Update the server connection settings." : "Add a new server connection." }}
+          {{
+            isEdit()
+              ? "Update the server connection settings."
+              : "Add a new server connection."
+          }}
         </DialogDescription>
       </DialogHeader>
 
@@ -83,7 +87,8 @@ function handleClose() {
             required
           />
           <p class="text-xs text-muted-foreground">
-            Right-click server → Copy ID (Enable Developer Mode in Discord settings)
+            Right-click server → Copy ID (Enable Developer Mode in Discord
+            settings)
           </p>
         </div>
 

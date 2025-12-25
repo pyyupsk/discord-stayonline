@@ -10,48 +10,53 @@ const config = ref<Configuration>({
 const loading = ref(false);
 const error = ref<string | null>(null);
 
-export function useConfig() {
-  async function fetchServerNames(servers: ServerEntry[]): Promise<void> {
-    if (servers.length === 0) return;
+function generateId(): string {
+  return Array.from({ length: 8 }, () =>
+    Math.floor(Math.random() * 16).toString(16),
+  ).join("");
+}
 
-    try {
-      const response = await fetch("/api/discord/bulk-info", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(
-          servers.map((s) => ({
-            guild_id: s.guild_id,
-            channel_id: s.channel_id,
-          }))
-        ),
-      });
+async function fetchServerNames(servers: ServerEntry[]): Promise<void> {
+  if (servers.length === 0) return;
 
-      if (!response.ok) return;
+  try {
+    const response = await fetch("/api/discord/bulk-info", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(
+        servers.map((s) => ({
+          guild_id: s.guild_id,
+          channel_id: s.channel_id,
+        })),
+      ),
+    });
 
-      const results: Array<{
-        guild_id: string;
-        guild_name: string;
-        channel_id: string;
-        channel_name: string;
-      }> = await response.json();
+    if (!response.ok) return;
 
-      // Merge names into servers
-      for (const result of results) {
-        const server = servers.find(
-          (s) =>
-            s.guild_id === result.guild_id &&
-            s.channel_id === result.channel_id
-        );
-        if (server) {
-          server.guild_name = result.guild_name || undefined;
-          server.channel_name = result.channel_name || undefined;
-        }
+    const results: Array<{
+      guild_id: string;
+      guild_name: string;
+      channel_id: string;
+      channel_name: string;
+    }> = await response.json();
+
+    // Merge names into servers
+    for (const result of results) {
+      const server = servers.find(
+        (s) =>
+          s.guild_id === result.guild_id && s.channel_id === result.channel_id,
+      );
+      if (server) {
+        server.guild_name = result.guild_name || undefined;
+        server.channel_name = result.channel_name || undefined;
       }
-    } catch {
-      // Silently fail - names are optional
     }
+  } catch {
+    // Silently fail - names are optional
   }
+}
 
+export function useConfig() {
   async function loadConfig() {
     loading.value = true;
     error.value = null;
@@ -152,7 +157,7 @@ export function useConfig() {
 
   async function updateServer(id: string, updates: Partial<ServerEntry>) {
     const servers = config.value.servers.map((s) =>
-      s.id === id ? { ...s, ...updates } : s
+      s.id === id ? { ...s, ...updates } : s,
     );
     return saveConfig(servers);
   }
@@ -160,12 +165,6 @@ export function useConfig() {
   async function deleteServer(id: string) {
     const servers = config.value.servers.filter((s) => s.id !== id);
     return saveConfig(servers);
-  }
-
-  function generateId(): string {
-    return Array.from({ length: 8 }, () =>
-      Math.floor(Math.random() * 16).toString(16)
-    ).join("");
   }
 
   function setConfig(newConfig: Configuration) {

@@ -10,7 +10,7 @@ const MAX_RECONNECT_ATTEMPTS = 10;
 const MAX_LOG_ENTRIES = 100;
 
 const wsStatus = ref<"connected" | "connecting" | "disconnected" | "error">(
-  "disconnected"
+  "disconnected",
 );
 const serverStatuses = ref<Map<string, ConnectionStatus>>(new Map());
 const logs = ref<LogEntry[]>([]);
@@ -18,6 +18,17 @@ const logs = ref<LogEntry[]>([]);
 let ws: WebSocket | null = null;
 let reconnectAttempt = 0;
 let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
+
+function disconnect() {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
+}
 
 export function useWebSocket() {
   let onConfigChanged: ((config: Configuration) => void) | null = null;
@@ -27,8 +38,8 @@ export function useWebSocket() {
 
     wsStatus.value = "connecting";
 
-    const protocol = window.location.protocol === "https:" ? "wss:" : "ws:";
-    const wsUrl = `${protocol}//${window.location.host}/ws`;
+    const protocol = globalThis.location.protocol === "https:" ? "wss:" : "ws:";
+    const wsUrl = `${protocol}//${globalThis.location.host}/ws`;
 
     try {
       ws = new WebSocket(wsUrl);
@@ -131,17 +142,6 @@ export function useWebSocket() {
 
   function getServerStatus(serverId: string): ConnectionStatus {
     return serverStatuses.value.get(serverId) || "disconnected";
-  }
-
-  function disconnect() {
-    if (reconnectTimeout) {
-      clearTimeout(reconnectTimeout);
-      reconnectTimeout = null;
-    }
-    if (ws) {
-      ws.close();
-      ws = null;
-    }
   }
 
   function setOnConfigChanged(callback: (config: Configuration) => void) {
