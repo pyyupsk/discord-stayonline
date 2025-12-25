@@ -7,6 +7,7 @@ const MAX_LOG_ENTRIES = 500;
 
 const wsStatus = ref<"connected" | "connecting" | "disconnected" | "error">("disconnected");
 const serverStatuses = ref<Map<string, ConnectionStatus>>(new Map());
+const serverNames = ref<Map<string, string>>(new Map());
 const logs = ref<LogEntry[]>([]);
 const logFilter = ref<"all" | LogEntry["level"]>("all");
 
@@ -125,12 +126,24 @@ export function useWebSocket() {
       case "config_changed":
         if (msg.config && onConfigChanged) {
           onConfigChanged(msg.config);
+          // Update server names cache from config
+          updateServerNamesFromConfig(msg.config);
         }
-        addLog("info", "Configuration updated");
+        addLogEntry({
+          action: "config",
+          level: "info",
+          message: "Configuration updated",
+        });
         break;
 
       case "error":
-        addLog("error", `[${msg.code}] ${msg.message}`);
+        addLogEntry({
+          action: "error",
+          level: "error",
+          message: msg.message || "Unknown error",
+          serverId: msg.server_id,
+          serverName: getServerName(msg.server_id),
+        });
         if (msg.server_id) {
           serverStatuses.value.set(msg.server_id, "error");
         }
@@ -138,16 +151,29 @@ export function useWebSocket() {
 
       case "log":
         if (msg.message) {
-          addLog((msg.level as LogEntry["level"]) || "info", msg.message);
+          addLogEntry({
+            action: "system",
+            level: (msg.level as LogEntry["level"]) || "info",
+            message: msg.message,
+          });
         }
         break;
 
       case "status":
         if (msg.server_id && msg.status) {
           serverStatuses.value.set(msg.server_id, msg.status);
-          if (msg.message) {
-            addLog("info", `[${msg.server_id}] ${msg.message}`);
-          }
+          const serverName = getServerName(msg.server_id);
+          const action = mapStatusToAction(msg.status);
+          const friendlyMessage = getFriendlyStatusMessage(msg.status, serverName, msg.message);
+
+          const level = getLogLevelForStatus(msg.status);
+          addLogEntry({
+            action,
+            level,
+            message: friendlyMessage,
+            serverId: msg.server_id,
+            serverName,
+          });
         }
         break;
     }
@@ -166,10 +192,13 @@ export function useWebSocket() {
     reconnectTimeout = setTimeout(connect, delay);
   }
 
-  function addLog(level: LogEntry["level"], message: string) {
+  function addLog(level: LogEntry["level"], message: string, action?: LogEntry["action"]) {
+    addLogEntry({ action: action || "system", level, message });
+  }
+
+  function addLogEntry(entry: Omit<LogEntry, "time">) {
     logs.value.push({
-      level,
-      message,
+      ...entry,
       time: new Date(),
     });
 
@@ -213,6 +242,7 @@ export function useWebSocket() {
     serverStatuses,
     setLogFilter,
     setOnConfigChanged,
+    updateServerNamesFromConfig,
     wsStatus,
   };
 }
@@ -225,5 +255,68 @@ function disconnect() {
   if (ws) {
     ws.close();
     ws = null;
+  }
+}
+
+function getFriendlyStatusMessage(
+  status: ConnectionStatus,
+  serverName?: string,
+  originalMessage?: string,
+): string {
+  const name = serverName || "Server";
+
+  switch (status) {
+    case "backoff":
+      return `Reconnecting to ${name}...`;
+    case "connected":
+      return `${name} is now online`;
+    case "connecting":
+      return `Connecting to ${name}...`;
+    case "disconnected":
+      return `${name} disconnected`;
+    case "error":
+      return originalMessage ? `${name}: ${originalMessage}` : `${name} encountered an error`;
+    default:
+      return originalMessage || `${name} status changed`;
+  }
+}
+
+function getLogLevelForStatus(status: ConnectionStatus): LogEntry["level"] {
+  switch (status) {
+    case "backoff":
+      return "warn";
+    case "error":
+      return "error";
+    default:
+      return "info";
+  }
+}
+
+function getServerName(serverId?: string): string | undefined {
+  if (!serverId) return undefined;
+  return serverNames.value.get(serverId);
+}
+
+function mapStatusToAction(status: ConnectionStatus): LogEntry["action"] {
+  switch (status) {
+    case "backoff":
+      return "backoff";
+    case "connected":
+      return "connected";
+    case "connecting":
+      return "connecting";
+    case "disconnected":
+      return "disconnected";
+    case "error":
+      return "error";
+    default:
+      return "system";
+  }
+}
+
+function updateServerNamesFromConfig(config: Configuration) {
+  for (const server of config.servers) {
+    const name = server.guild_name || `Server ${server.guild_id.slice(-4)}`;
+    serverNames.value.set(server.id, name);
   }
 }

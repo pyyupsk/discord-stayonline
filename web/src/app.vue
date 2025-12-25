@@ -37,6 +37,7 @@ const {
   logFilter,
   setLogFilter,
   setOnConfigChanged,
+  updateServerNamesFromConfig,
   wsStatus,
 } = useWebSocket();
 const { exitServer, isLoading, joinServer, rejoinServer } = useServers();
@@ -54,11 +55,13 @@ onMounted(async () => {
 
   if (authenticated.value || !authRequired.value) {
     await loadConfig();
+    updateServerNamesFromConfig(config.value);
 
     if (config.value.tos_acknowledged) {
       connect();
       setOnConfigChanged((newConfig) => {
         setConfig(newConfig);
+        updateServerNamesFromConfig(newConfig);
       });
     }
   }
@@ -74,11 +77,13 @@ async function handleLogout() {
 watch(authenticated, async (isAuthenticated) => {
   if (isAuthenticated && !initialLoading.value) {
     await loadConfig();
+    updateServerNamesFromConfig(config.value);
 
     if (config.value.tos_acknowledged) {
       connect();
       setOnConfigChanged((newConfig) => {
         setConfig(newConfig);
+        updateServerNamesFromConfig(newConfig);
       });
     }
   }

@@ -1,5 +1,16 @@
 <script setup lang="ts">
-import { Trash2 } from "lucide-vue-next";
+import {
+  AlertCircle,
+  CheckCircle2,
+  Info,
+  Loader2,
+  RefreshCw,
+  Settings,
+  Trash2,
+  Unplug,
+  Wifi,
+} from "lucide-vue-next";
+import { computed } from "vue";
 
 import type { LogEntry } from "@/types";
 
@@ -8,7 +19,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 type LogFilter = "all" | LogEntry["level"];
 
-defineProps<{
+const props = defineProps<{
   filter: LogFilter;
   logs: LogEntry[];
 }>();
@@ -25,41 +36,71 @@ const filterOptions: { label: string; value: LogFilter }[] = [
   { label: "Error", value: "error" },
 ];
 
+// Reverse logs to show newest first
+const reversedLogs = computed(() => [...props.logs].reverse());
+
 function formatTime(date: Date): string {
-  return date.toLocaleTimeString();
+  return date.toLocaleTimeString("en-US", {
+    hour: "2-digit",
+    hour12: false,
+    minute: "2-digit",
+    second: "2-digit",
+  });
 }
 
-function getLevelClass(level: LogEntry["level"]): string {
-  switch (level) {
-    case "debug":
+function getActionClass(action?: LogEntry["action"], isLatest = false): string {
+  switch (action) {
+    case "backoff":
+      return isLatest ? "text-warning animate-spin" : "text-warning";
+    case "config":
+      return "text-primary";
+    case "connected":
+      return "text-success";
+    case "connecting":
+      return isLatest ? "text-muted-foreground animate-spin" : "text-muted-foreground";
+    case "disconnected":
       return "text-muted-foreground";
     case "error":
       return "text-destructive";
-    case "warn":
-      return "text-warning";
     default:
-      return "text-success";
+      return "text-muted-foreground";
   }
 }
 
-function getLevelIndicator(level: LogEntry["level"]): string {
-  switch (level) {
-    case "debug":
-      return "bg-muted-foreground";
+function getActionIcon(action?: LogEntry["action"]) {
+  switch (action) {
+    case "backoff":
+      return RefreshCw;
+    case "config":
+      return Settings;
+    case "connected":
+      return CheckCircle2;
+    case "connecting":
+      return Loader2;
+    case "disconnected":
+      return Unplug;
     case "error":
-      return "bg-destructive";
-    case "warn":
-      return "bg-warning";
+      return AlertCircle;
     default:
-      return "bg-success";
+      return Info;
   }
+}
+
+function getMessageClass(log: LogEntry): string {
+  if (log.action === "connected") return "text-success";
+  if (log.action === "error" || log.level === "error") return "text-destructive";
+  if (log.action === "backoff" || log.level === "warn") return "text-warning";
+  return "text-foreground/80";
 }
 </script>
 
 <template>
   <div class="flex flex-col gap-3">
     <div class="flex items-center justify-between">
-      <h3 class="text-sm font-medium">Activity Log</h3>
+      <div class="flex items-center gap-2">
+        <h3 class="text-sm font-medium">Activity Log</h3>
+        <span class="text-muted-foreground text-xs">({{ logs.length }} events)</span>
+      </div>
       <div class="flex items-center gap-2">
         <div class="border-border/50 flex rounded-md border">
           <Button
@@ -75,34 +116,55 @@ function getLevelIndicator(level: LogEntry["level"]): string {
         </div>
         <Button
           variant="ghost"
-          size="icon-sm"
-          class="press-effect text-muted-foreground hover:text-foreground text-xs"
+          size="sm"
+          class="press-effect text-muted-foreground hover:text-foreground h-7 px-2"
+          title="Clear logs"
           @click="emit('clear')"
         >
-          <Trash2 />
+          <Trash2 class="h-3.5 w-3.5" />
         </Button>
       </div>
     </div>
 
-    <ScrollArea class="terminal-log border-border/50 h-52 rounded-lg border p-4">
+    <ScrollArea class="terminal-log border-border/50 h-64 rounded-lg border">
       <div
         v-if="logs.length === 0"
-        class="text-muted-foreground flex h-full items-center justify-center text-sm"
+        class="text-muted-foreground flex h-full min-h-[200px] flex-col items-center justify-center gap-2"
       >
-        <span class="opacity-50">No activity yet</span>
+        <Wifi class="h-8 w-8 opacity-20" />
+        <span class="text-sm opacity-50">No activity yet</span>
+        <span class="text-xs opacity-30">Events will appear here as they happen</span>
       </div>
-      <div v-else class="space-y-2 font-mono text-xs">
-        <div v-for="(log, index) in logs" :key="index" class="fade-in flex items-start gap-3">
-          <span class="text-muted-foreground shrink-0 tabular-nums">
+      <div v-else class="space-y-0.5 p-3">
+        <div
+          v-for="(log, index) in reversedLogs"
+          :key="index"
+          class="fade-in group flex items-start gap-3 rounded-md px-2 py-1.5 transition-colors hover:bg-white/5"
+        >
+          <!-- Time -->
+          <span class="text-muted-foreground shrink-0 font-mono text-xs tabular-nums">
             {{ formatTime(log.time) }}
           </span>
-          <span class="flex shrink-0 items-center gap-1.5">
-            <span class="h-1.5 w-1.5 rounded-full" :class="getLevelIndicator(log.level)" />
-            <span :class="getLevelClass(log.level)" class="font-medium uppercase">
-              {{ log.level }}
-            </span>
+
+          <!-- Action Icon -->
+          <component
+            :is="getActionIcon(log.action)"
+            class="mt-0.5 h-3.5 w-3.5 shrink-0"
+            :class="getActionClass(log.action, index === 0)"
+          />
+
+          <!-- Message -->
+          <span class="flex-1 text-sm" :class="getMessageClass(log)">
+            {{ log.message }}
           </span>
-          <span class="text-foreground/90">{{ log.message }}</span>
+
+          <!-- Server Badge -->
+          <span
+            v-if="log.serverName"
+            class="bg-muted text-muted-foreground shrink-0 rounded px-1.5 py-0.5 text-xs opacity-0 transition-opacity group-hover:opacity-100"
+          >
+            {{ log.serverName }}
+          </span>
         </div>
       </div>
     </ScrollArea>

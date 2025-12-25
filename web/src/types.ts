@@ -13,8 +13,11 @@ export type GuildInfo = {
 };
 
 export type LogEntry = {
+  action?: "backoff" | "config" | "connected" | "connecting" | "disconnected" | "error" | "system";
   level: "debug" | "error" | "info" | "warn";
   message: string;
+  serverId?: string;
+  serverName?: string;
   time: Date;
 };
 
