@@ -6,9 +6,11 @@ import (
 	"time"
 )
 
+const testTokenReconnect = "test-token"
+
 func TestNewReconnector(t *testing.T) {
-	client := NewClient("test-token", nil)
-	reconnector := NewReconnector(client, "test-token", nil)
+	client := NewClient(testTokenReconnect, nil)
+	reconnector := NewReconnector(client, testTokenReconnect, nil)
 
 	if reconnector == nil {
 		t.Fatal("NewReconnector returned nil")
@@ -16,8 +18,8 @@ func TestNewReconnector(t *testing.T) {
 	if reconnector.client != client {
 		t.Error("client not set correctly")
 	}
-	if reconnector.token != "test-token" {
-		t.Errorf("expected token 'test-token', got '%s'", reconnector.token)
+	if reconnector.token != testTokenReconnect {
+		t.Errorf("expected token '%s', got '%s'", testTokenReconnect, reconnector.token)
 	}
 	if reconnector.maxAttempt != 10 {
 		t.Errorf("expected maxAttempt 10, got %d", reconnector.maxAttempt)
@@ -25,8 +27,8 @@ func TestNewReconnector(t *testing.T) {
 }
 
 func TestReconnectorAttempt(t *testing.T) {
-	client := NewClient("test-token", nil)
-	reconnector := NewReconnector(client, "test-token", nil)
+	client := NewClient(testTokenReconnect, nil)
+	reconnector := NewReconnector(client, testTokenReconnect, nil)
 
 	if reconnector.Attempt() != 0 {
 		t.Errorf("expected initial attempt 0, got %d", reconnector.Attempt())
@@ -34,8 +36,8 @@ func TestReconnectorAttempt(t *testing.T) {
 }
 
 func TestReconnectorResetAttempts(t *testing.T) {
-	client := NewClient("test-token", nil)
-	reconnector := NewReconnector(client, "test-token", nil)
+	client := NewClient(testTokenReconnect, nil)
+	reconnector := NewReconnector(client, testTokenReconnect, nil)
 
 	reconnector.attempt = 5
 	reconnector.ResetAttempts()
@@ -46,8 +48,8 @@ func TestReconnectorResetAttempts(t *testing.T) {
 }
 
 func TestReconnectorStop(t *testing.T) {
-	client := NewClient("test-token", nil)
-	reconnector := NewReconnector(client, "test-token", nil)
+	client := NewClient(testTokenReconnect, nil)
+	reconnector := NewReconnector(client, testTokenReconnect, nil)
 
 	// Stop should work without panicking
 	reconnector.Stop()
@@ -61,8 +63,8 @@ func TestReconnectorStop(t *testing.T) {
 }
 
 func TestReconnectorStartWithContextCancel(t *testing.T) {
-	client := NewClient("test-token", nil)
-	reconnector := NewReconnector(client, "test-token", nil)
+	client := NewClient(testTokenReconnect, nil)
+	reconnector := NewReconnector(client, testTokenReconnect, nil)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 100*time.Millisecond)
 	defer cancel()
@@ -82,8 +84,8 @@ func TestReconnectorStartWithContextCancel(t *testing.T) {
 }
 
 func TestReconnectorStartWithStop(t *testing.T) {
-	client := NewClient("test-token", nil)
-	reconnector := NewReconnector(client, "test-token", nil)
+	client := NewClient(testTokenReconnect, nil)
+	reconnector := NewReconnector(client, testTokenReconnect, nil)
 
 	ctx := context.Background()
 
@@ -108,8 +110,8 @@ func TestReconnectorStartWithStop(t *testing.T) {
 }
 
 func TestReconnectorMaxAttempts(t *testing.T) {
-	client := NewClient("test-token", nil)
-	reconnector := NewReconnector(client, "test-token", nil)
+	client := NewClient(testTokenReconnect, nil)
+	reconnector := NewReconnector(client, testTokenReconnect, nil)
 	reconnector.maxAttempt = 0 // Set to 0 so it exits immediately
 
 	ctx := context.Background()

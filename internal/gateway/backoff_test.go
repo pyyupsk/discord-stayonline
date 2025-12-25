@@ -46,7 +46,7 @@ func TestCalculateBackoff(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				got := CalculateBackoff(tt.attempt)
 				if got < tt.wantMinDelay {
 					t.Errorf("CalculateBackoff(%d) = %v, want >= %v", tt.attempt, got, tt.wantMinDelay)
@@ -61,7 +61,7 @@ func TestCalculateBackoff(t *testing.T) {
 
 func TestCalculateBackoffJitterVariability(t *testing.T) {
 	results := make(map[time.Duration]bool)
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		delay := CalculateBackoff(2)
 		results[delay] = true
 	}

@@ -5,114 +5,154 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 )
 
-func TestConfigStoreLoadSave(t *testing.T) {
-	// Create temp directory for test
-	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
+const (
+	testConfigFile  = "config.json"
+	testServerID1   = "test-1"
+	testGuildID1    = "123456789012345678"
+	testChannelID1  = "234567890123456789"
+	errLoadFormat   = "Load() error = %v"
+	errSaveFormat   = "Save() error = %v"
+)
 
+func TestConfigStoreLoadNonExistent(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, testConfigFile)
 	store := config.NewStore(configPath)
 
-	// Test loading non-existent file returns default config
-	t.Run("load non-existent file returns default", func(t *testing.T) {
-		cfg, err := store.Load()
-		if err != nil {
-			t.Fatalf("Load() error = %v", err)
-		}
-		if cfg == nil {
-			t.Fatal("Load() returned nil config")
-		}
-		if len(cfg.Servers) != 0 {
-			t.Errorf("expected empty servers, got %d", len(cfg.Servers))
-		}
-		if cfg.TOSAcknowledged {
-			t.Error("expected TOSAcknowledged to be false")
-		}
-		if cfg.Status != config.StatusOnline {
-			t.Errorf("expected default status 'online', got '%s'", cfg.Status)
-		}
-	})
+	cfg, err := store.Load()
+	if err != nil {
+		t.Fatalf(errLoadFormat, err)
+	}
 
-	// Test save and load roundtrip
-	t.Run("save and load roundtrip", func(t *testing.T) {
-		cfg := &config.Configuration{
-			Servers: []config.ServerEntry{
-				{
-					ID:             "test-1",
-					GuildID:        "123456789012345678",
-					ChannelID:      "234567890123456789",
-					ConnectOnStart: true,
-					Priority:       1,
-				},
-				{
-					ID:             "test-2",
-					GuildID:        "987654321098765432",
-					ChannelID:      "876543210987654321",
-					ConnectOnStart: false,
-					Priority:       2,
-				},
+	assertDefaultConfig(t, cfg)
+}
+
+func TestConfigStoreSaveAndLoad(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, testConfigFile)
+	store := config.NewStore(configPath)
+
+	cfg := createTestConfig()
+
+	if err := store.Save(cfg); err != nil {
+		t.Fatalf(errSaveFormat, err)
+	}
+
+	loaded, err := store.Load()
+	if err != nil {
+		t.Fatalf(errLoadFormat, err)
+	}
+
+	assertLoadedConfig(t, loaded)
+}
+
+func TestConfigStoreAtomicWrite(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, testConfigFile)
+	store := config.NewStore(configPath)
+
+	cfg := createTestConfig()
+	if err := store.Save(cfg); err != nil {
+		t.Fatalf(errSaveFormat, err)
+	}
+
+	tmpPath := configPath + ".tmp"
+	if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
+		t.Error("temp file should not exist after save")
+	}
+}
+
+func TestConfigStoreFilePermissions(t *testing.T) {
+	tmpDir := t.TempDir()
+	configPath := filepath.Join(tmpDir, testConfigFile)
+	store := config.NewStore(configPath)
+
+	cfg := createTestConfig()
+	if err := store.Save(cfg); err != nil {
+		t.Fatalf(errSaveFormat, err)
+	}
+
+	info, err := os.Stat(configPath)
+	if err != nil {
+		t.Fatalf("Stat() error = %v", err)
+	}
+
+	perm := info.Mode().Perm()
+	if perm != 0600 {
+		t.Errorf("expected permissions 0600, got %o", perm)
+	}
+}
+
+// assertDefaultConfig verifies that cfg has default values.
+func assertDefaultConfig(t *testing.T, cfg *config.Configuration) {
+	t.Helper()
+	if cfg == nil {
+		t.Fatal("Load() returned nil config")
+	}
+	if len(cfg.Servers) != 0 {
+		t.Errorf("expected empty servers, got %d", len(cfg.Servers))
+	}
+	if cfg.TOSAcknowledged {
+		t.Error("expected TOSAcknowledged to be false")
+	}
+	if cfg.Status != config.StatusOnline {
+		t.Errorf("expected default status 'online', got '%s'", cfg.Status)
+	}
+}
+
+// assertLoadedConfig verifies loaded config matches expected values.
+func assertLoadedConfig(t *testing.T, loaded *config.Configuration) {
+	t.Helper()
+	if len(loaded.Servers) != 2 {
+		t.Errorf("expected 2 servers, got %d", len(loaded.Servers))
+	}
+	if !loaded.TOSAcknowledged {
+		t.Error("expected TOSAcknowledged to be true")
+	}
+	if loaded.Status != config.StatusIdle {
+		t.Errorf("expected status 'idle', got '%s'", loaded.Status)
+	}
+	if loaded.Servers[0].ID != testServerID1 {
+		t.Errorf("expected server ID '%s', got '%s'", testServerID1, loaded.Servers[0].ID)
+	}
+	if loaded.Servers[0].GuildID != testGuildID1 {
+		t.Errorf("expected guild ID '%s', got '%s'", testGuildID1, loaded.Servers[0].GuildID)
+	}
+}
+
+// createTestConfig creates a configuration for testing.
+func createTestConfig() *config.Configuration {
+	return &config.Configuration{
+		Servers: []config.ServerEntry{
+			{
+				ID:             testServerID1,
+				GuildID:        testGuildID1,
+				ChannelID:      testChannelID1,
+				ConnectOnStart: true,
+				Priority:       1,
 			},
-			Status:          config.StatusIdle,
-			TOSAcknowledged: true,
-		}
-
-		if err := store.Save(cfg); err != nil {
-			t.Fatalf("Save() error = %v", err)
-		}
-
-		loaded, err := store.Load()
-		if err != nil {
-			t.Fatalf("Load() error = %v", err)
-		}
-
-		if len(loaded.Servers) != 2 {
-			t.Errorf("expected 2 servers, got %d", len(loaded.Servers))
-		}
-		if !loaded.TOSAcknowledged {
-			t.Error("expected TOSAcknowledged to be true")
-		}
-		if loaded.Status != config.StatusIdle {
-			t.Errorf("expected status 'idle', got '%s'", loaded.Status)
-		}
-
-		// Verify first server
-		if loaded.Servers[0].ID != "test-1" {
-			t.Errorf("expected server ID 'test-1', got '%s'", loaded.Servers[0].ID)
-		}
-		if loaded.Servers[0].GuildID != "123456789012345678" {
-			t.Errorf("expected guild ID '123456789012345678', got '%s'", loaded.Servers[0].GuildID)
-		}
-	})
-
-	// Test atomic write (temp file is cleaned up)
-	t.Run("atomic write cleans up temp file", func(t *testing.T) {
-		tmpPath := configPath + ".tmp"
-		if _, err := os.Stat(tmpPath); !os.IsNotExist(err) {
-			t.Error("temp file should not exist after save")
-		}
-	})
-
-	// Test file permissions
-	t.Run("saved file has correct permissions", func(t *testing.T) {
-		info, err := os.Stat(configPath)
-		if err != nil {
-			t.Fatalf("Stat() error = %v", err)
-		}
-		// File should be readable/writable by owner only (0600)
-		perm := info.Mode().Perm()
-		if perm != 0600 {
-			t.Errorf("expected permissions 0600, got %o", perm)
-		}
-	})
+			{
+				ID:             "test-2",
+				GuildID:        "987654321098765432",
+				ChannelID:      "876543210987654321",
+				ConnectOnStart: false,
+				Priority:       2,
+			},
+		},
+		Status:          config.StatusIdle,
+		TOSAcknowledged: true,
+	}
 }
 
 func TestConfigStoreEmptyFile(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
+	configPath := filepath.Join(tmpDir, testConfigFile)
 
 	// Create empty file
 	if err := os.WriteFile(configPath, []byte(""), 0600); err != nil {
@@ -122,7 +162,7 @@ func TestConfigStoreEmptyFile(t *testing.T) {
 	store := config.NewStore(configPath)
 	cfg, err := store.Load()
 	if err != nil {
-		t.Fatalf("Load() error = %v", err)
+		t.Fatalf(errLoadFormat, err)
 	}
 	if cfg == nil {
 		t.Fatal("Load() returned nil config for empty file")
@@ -134,7 +174,7 @@ func TestConfigStoreEmptyFile(t *testing.T) {
 
 func TestConfigStoreInvalidJSON(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
+	configPath := filepath.Join(tmpDir, testConfigFile)
 
 	// Create file with invalid JSON
 	if err := os.WriteFile(configPath, []byte("{invalid json}"), 0600); err != nil {
@@ -150,7 +190,7 @@ func TestConfigStoreInvalidJSON(t *testing.T) {
 
 func TestConfigStoreSaveValidation(t *testing.T) {
 	tmpDir := t.TempDir()
-	configPath := filepath.Join(tmpDir, "config.json")
+	configPath := filepath.Join(tmpDir, testConfigFile)
 	store := config.NewStore(configPath)
 
 	// Test saving config with too many servers
@@ -182,8 +222,8 @@ func TestConfigStoreSaveValidation(t *testing.T) {
 			Servers: []config.ServerEntry{
 				{
 					ID:        "",
-					GuildID:   "123456789012345678",
-					ChannelID: "234567890123456789",
+					GuildID:   testGuildID1,
+					ChannelID: testChannelID1,
 					Priority:  1,
 				},
 			},
@@ -219,9 +259,9 @@ func TestServerEntryValidation(t *testing.T) {
 		{
 			name: "valid entry",
 			entry: config.ServerEntry{
-				ID:             "test-1",
-				GuildID:        "123456789012345678",
-				ChannelID:      "234567890123456789",
+				ID:             testServerID1,
+				GuildID:        testGuildID1,
+				ChannelID:      testChannelID1,
 				ConnectOnStart: true,
 				Priority:       1,
 			},
@@ -231,8 +271,8 @@ func TestServerEntryValidation(t *testing.T) {
 			name: "empty ID",
 			entry: config.ServerEntry{
 				ID:        "",
-				GuildID:   "123456789012345678",
-				ChannelID: "234567890123456789",
+				GuildID:   testGuildID1,
+				ChannelID: testChannelID1,
 				Priority:  1,
 			},
 			wantErr: config.ErrEmptyID,
@@ -240,9 +280,9 @@ func TestServerEntryValidation(t *testing.T) {
 		{
 			name: "empty guild ID",
 			entry: config.ServerEntry{
-				ID:        "test-1",
+				ID:        testServerID1,
 				GuildID:   "",
-				ChannelID: "234567890123456789",
+				ChannelID: testChannelID1,
 				Priority:  1,
 			},
 			wantErr: config.ErrEmptyGuildID,
@@ -250,8 +290,8 @@ func TestServerEntryValidation(t *testing.T) {
 		{
 			name: "empty channel ID",
 			entry: config.ServerEntry{
-				ID:        "test-1",
-				GuildID:   "123456789012345678",
+				ID:        testServerID1,
+				GuildID:   testGuildID1,
 				ChannelID: "",
 				Priority:  1,
 			},
@@ -260,9 +300,9 @@ func TestServerEntryValidation(t *testing.T) {
 		{
 			name: "zero priority",
 			entry: config.ServerEntry{
-				ID:        "test-1",
-				GuildID:   "123456789012345678",
-				ChannelID: "234567890123456789",
+				ID:        testServerID1,
+				GuildID:   testGuildID1,
+				ChannelID: testChannelID1,
 				Priority:  0,
 			},
 			wantErr: config.ErrInvalidPriority,
@@ -270,9 +310,9 @@ func TestServerEntryValidation(t *testing.T) {
 		{
 			name: "negative priority",
 			entry: config.ServerEntry{
-				ID:        "test-1",
-				GuildID:   "123456789012345678",
-				ChannelID: "234567890123456789",
+				ID:        testServerID1,
+				GuildID:   testGuildID1,
+				ChannelID: testChannelID1,
 				Priority:  -1,
 			},
 			wantErr: config.ErrInvalidPriority,
@@ -293,9 +333,9 @@ func TestConfigurationJSONFormat(t *testing.T) {
 	cfg := &config.Configuration{
 		Servers: []config.ServerEntry{
 			{
-				ID:             "test-1",
-				GuildID:        "123456789012345678",
-				ChannelID:      "234567890123456789",
+				ID:             testServerID1,
+				GuildID:        testGuildID1,
+				ChannelID:      testChannelID1,
 				ConnectOnStart: true,
 				Priority:       1,
 			},
@@ -323,21 +363,9 @@ func TestConfigurationJSONFormat(t *testing.T) {
 	}
 
 	for _, field := range expectedFields {
-		if !contains(jsonStr, field) {
+		if !strings.Contains(jsonStr, field) {
 			t.Errorf("JSON should contain field %s", field)
 		}
 	}
 }
 
-func contains(s, substr string) bool {
-	return len(s) >= len(substr) && (s == substr || len(s) > 0 && containsHelper(s, substr))
-}
-
-func containsHelper(s, substr string) bool {
-	for i := 0; i <= len(s)-len(substr); i++ {
-		if s[i:i+len(substr)] == substr {
-			return true
-		}
-	}
-	return false
-}

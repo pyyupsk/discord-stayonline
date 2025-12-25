@@ -67,7 +67,7 @@ func TestCalculateBackoff(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			// Run multiple times to account for jitter
-			for i := 0; i < 10; i++ {
+			for range 10 {
 				got := gateway.CalculateBackoff(tt.attempt)
 
 				if got < tt.wantBaseDelay {
@@ -88,13 +88,10 @@ func TestCalculateBackoffExponentialDoubling(t *testing.T) {
 
 	for attempt := 1; attempt <= 5; attempt++ {
 		// Get the theoretical minimum (base * 2^attempt, capped at max)
-		expectedMin := gateway.BaseDelay * time.Duration(1<<uint(attempt))
-		if expectedMin > gateway.MaxDelay {
-			expectedMin = gateway.MaxDelay
-		}
+		expectedMin := min(gateway.BaseDelay*time.Duration(1<<uint(attempt)), gateway.MaxDelay)
 
 		// The actual delay should be at least the expected minimum
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			got := gateway.CalculateBackoff(attempt)
 			if got < expectedMin {
 				t.Errorf("attempt %d: got %v, expected >= %v", attempt, got, expectedMin)
@@ -115,7 +112,7 @@ func TestCalculateBackoffJitterRange(t *testing.T) {
 	// Test that jitter is actually adding variability
 	results := make(map[time.Duration]bool)
 
-	for i := 0; i < 100; i++ {
+	for range 100 {
 		delay := gateway.CalculateBackoff(2) // 4s base
 		results[delay] = true
 	}
@@ -130,7 +127,7 @@ func TestCalculateBackoffJitterRange(t *testing.T) {
 func TestCalculateBackoffCapAt60Seconds(t *testing.T) {
 	// Verify the cap is enforced at 60 seconds
 	for attempt := 6; attempt <= 20; attempt++ {
-		for i := 0; i < 10; i++ {
+		for range 10 {
 			got := gateway.CalculateBackoff(attempt)
 			maxWithJitter := gateway.MaxDelay + time.Duration(float64(gateway.MaxDelay)*gateway.JitterFactor)
 			if got > maxWithJitter {

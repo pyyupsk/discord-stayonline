@@ -14,6 +14,12 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/gateway"
 )
 
+const (
+	testToken          = "test-token"
+	errFailedToConnect = "failed to connect: %v"
+	errFailedReadHello = "failed to read HELLO: %v"
+)
+
 // MockGatewayServer simulates a Discord Gateway server for testing.
 type MockGatewayServer struct {
 	server          *httptest.Server
@@ -48,9 +54,9 @@ func NewMockGatewayServer(t *testing.T) *MockGatewayServer {
 		}
 
 		// Send HELLO
-		hello := map[string]interface{}{
+		hello := map[string]any{
 			"op": gateway.OpHello,
-			"d": map[string]interface{}{
+			"d": map[string]any{
 				"heartbeat_interval": 100, // 100ms for fast testing
 			},
 		}
@@ -111,11 +117,11 @@ func (m *MockGatewayServer) SendReady(ctx context.Context, sessionID string) err
 		return nil
 	}
 
-	ready := map[string]interface{}{
+	ready := map[string]any{
 		"op": gateway.OpDispatch,
 		"t":  "READY",
 		"s":  1,
-		"d": map[string]interface{}{
+		"d": map[string]any{
 			"v":                  10,
 			"session_id":         sessionID,
 			"resume_gateway_url": m.URL(),
@@ -135,7 +141,7 @@ func (m *MockGatewayServer) SendReconnect(ctx context.Context) error {
 		return nil
 	}
 
-	reconnect := map[string]interface{}{
+	reconnect := map[string]any{
 		"op": gateway.OpReconnect,
 		"d":  nil,
 	}
@@ -153,7 +159,7 @@ func (m *MockGatewayServer) SendInvalidSession(ctx context.Context, resumable bo
 		return nil
 	}
 
-	invalidSession := map[string]interface{}{
+	invalidSession := map[string]any{
 		"op": gateway.OpInvalidSession,
 		"d":  resumable,
 	}
@@ -213,7 +219,7 @@ func (m *MockGatewayServer) handleMessage(ctx context.Context, data []byte, t *t
 		}
 
 		// Send heartbeat ACK
-		ack := map[string]interface{}{
+		ack := map[string]any{
 			"op": gateway.OpHeartbeatAck,
 		}
 		ackData, _ := json.Marshal(ack)
@@ -255,7 +261,7 @@ func TestGatewayClientConnect(t *testing.T) {
 	// Read HELLO
 	_, data, err := conn.Read(ctx)
 	if err != nil {
-		t.Fatalf("failed to read HELLO: %v", err)
+		t.Fatalf(errFailedReadHello, err)
 	}
 
 	var hello struct {
@@ -296,18 +302,18 @@ func TestGatewayHeartbeat(t *testing.T) {
 	// Connect
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnect, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
 	if err != nil {
-		t.Fatalf("failed to read HELLO: %v", err)
+		t.Fatalf(errFailedReadHello, err)
 	}
 
 	// Send heartbeat
-	heartbeat := map[string]interface{}{
+	heartbeat := map[string]any{
 		"op": gateway.OpHeartbeat,
 		"d":  nil,
 	}
@@ -362,21 +368,21 @@ func TestGatewayIdentify(t *testing.T) {
 	// Connect
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnect, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
 	if err != nil {
-		t.Fatalf("failed to read HELLO: %v", err)
+		t.Fatalf(errFailedReadHello, err)
 	}
 
 	// Send IDENTIFY
-	identify := map[string]interface{}{
+	identify := map[string]any{
 		"op": gateway.OpIdentify,
-		"d": map[string]interface{}{
-			"token": "test-token",
+		"d": map[string]any{
+			"token": testToken,
 			"properties": map[string]string{
 				"os":      "Windows",
 				"browser": "Discord Client",
@@ -438,14 +444,14 @@ func TestGatewayReconnect(t *testing.T) {
 	// Connect
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnect, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
 	if err != nil {
-		t.Fatalf("failed to read HELLO: %v", err)
+		t.Fatalf(errFailedReadHello, err)
 	}
 
 	// Send reconnect from server
@@ -482,14 +488,14 @@ func TestGatewayInvalidSession(t *testing.T) {
 	// Connect
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnect, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
 	if err != nil {
-		t.Fatalf("failed to read HELLO: %v", err)
+		t.Fatalf(errFailedReadHello, err)
 	}
 
 	// Send invalid session (not resumable)
@@ -525,8 +531,8 @@ func TestGatewayInvalidSession(t *testing.T) {
 // TestReconnector tests the reconnection logic.
 func TestReconnector(t *testing.T) {
 	// Test that backoff is applied correctly
-	client := gateway.NewClient("test-token", nil)
-	reconnector := gateway.NewReconnector(client, "test-token", nil)
+	client := gateway.NewClient(testToken, nil)
+	reconnector := gateway.NewReconnector(client, testToken, nil)
 
 	if reconnector.Attempt() != 0 {
 		t.Errorf("expected initial attempt to be 0, got %d", reconnector.Attempt())
@@ -570,21 +576,21 @@ func TestFullConnectionLifecycle(t *testing.T) {
 	// Connect
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnect, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
 	if err != nil {
-		t.Fatalf("failed to read HELLO: %v", err)
+		t.Fatalf(errFailedReadHello, err)
 	}
 
 	// Send IDENTIFY
-	identify := map[string]interface{}{
+	identify := map[string]any{
 		"op": gateway.OpIdentify,
-		"d": map[string]interface{}{
-			"token": "test-token",
+		"d": map[string]any{
+			"token": testToken,
 			"properties": map[string]string{
 				"os":      "Windows",
 				"browser": "Discord Client",
@@ -611,8 +617,8 @@ func TestFullConnectionLifecycle(t *testing.T) {
 	}
 
 	// Send multiple heartbeats
-	for i := 0; i < 2; i++ {
-		heartbeat := map[string]interface{}{
+	for i := range 2 {
+		heartbeat := map[string]any{
 			"op": gateway.OpHeartbeat,
 			"d":  i,
 		}

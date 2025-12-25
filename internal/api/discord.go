@@ -21,7 +21,7 @@ type DiscordHandler struct {
 }
 
 type cacheEntry struct {
-	data      interface{}
+	data      any
 	expiresAt time.Time
 }
 
@@ -68,7 +68,7 @@ const (
 	cacheTTL       = 5 * time.Minute
 )
 
-func (h *DiscordHandler) getFromCache(key string) (interface{}, bool) {
+func (h *DiscordHandler) getFromCache(key string) (any, bool) {
 	h.mu.RLock()
 	defer h.mu.RUnlock()
 	if entry, ok := h.cache[key]; ok {
@@ -79,7 +79,7 @@ func (h *DiscordHandler) getFromCache(key string) (interface{}, bool) {
 	return nil, false
 }
 
-func (h *DiscordHandler) setCache(key string, data interface{}) {
+func (h *DiscordHandler) setCache(key string, data any) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 	h.cache[key] = &cacheEntry{
@@ -88,7 +88,7 @@ func (h *DiscordHandler) setCache(key string, data interface{}) {
 	}
 }
 
-func (h *DiscordHandler) fetchFromDiscord(endpoint string, result interface{}) error {
+func (h *DiscordHandler) fetchFromDiscord(endpoint string, result any) error {
 	req, err := http.NewRequest("GET", discordAPIBase+endpoint, nil)
 	if err != nil {
 		return err

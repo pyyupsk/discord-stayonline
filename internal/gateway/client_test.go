@@ -13,6 +13,14 @@ import (
 	"github.com/coder/websocket"
 )
 
+const (
+	testTokenClient       = "test-token"
+	testSessionID         = "test-session-id"
+	testOldSession        = "old-session"
+	errFailedToConnectFmt = "failed to connect: %v"
+	errExpectedNotConn    = "expected ErrNotConnected, got %v"
+)
+
 // mockGatewayServer simulates a Discord Gateway server for testing.
 type mockGatewayServer struct {
 	server             *httptest.Server
@@ -53,9 +61,9 @@ func newMockGatewayServer(t *testing.T) *mockGatewayServer {
 		}
 
 		// Send HELLO
-		hello := map[string]interface{}{
+		hello := map[string]any{
 			"op": OpHello,
-			"d": map[string]interface{}{
+			"d": map[string]any{
 				"heartbeat_interval": mock.heartbeatInterval,
 			},
 		}
@@ -109,18 +117,18 @@ func (m *mockGatewayServer) handleMessage(ctx context.Context, data []byte) {
 	switch msg.Op {
 	case OpIdentify:
 		if sendInvalidOnIdent {
-			invalid := map[string]interface{}{
+			invalid := map[string]any{
 				"op": OpInvalidSession,
 				"d":  false,
 			}
 			data, _ := json.Marshal(invalid)
 			_ = conn.Write(ctx, websocket.MessageText, data)
 		} else if sendReadyOnIdent {
-			ready := map[string]interface{}{
+			ready := map[string]any{
 				"op": OpDispatch,
 				"t":  "READY",
 				"s":  1,
-				"d": map[string]interface{}{
+				"d": map[string]any{
 					"v":                  10,
 					"session_id":         "test-session-123",
 					"resume_gateway_url": m.URL(),
@@ -135,27 +143,27 @@ func (m *mockGatewayServer) handleMessage(ctx context.Context, data []byte) {
 		m.heartbeatCount++
 		m.mu.Unlock()
 
-		ack := map[string]interface{}{
+		ack := map[string]any{
 			"op": OpHeartbeatAck,
 		}
 		ackData, _ := json.Marshal(ack)
 		_ = conn.Write(ctx, websocket.MessageText, ackData)
 
 	case OpPresenceUpdate:
-		// Acknowledge presence update
+		// No response needed for presence update
 
 	case OpVoiceStateUpdate:
-		// Acknowledge voice state update
+		// No response needed for voice state update
 	}
 }
 
 func TestNewClient(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	if client == nil {
 		t.Fatal("NewClient returned nil")
 	}
-	if client.token != "test-token" {
-		t.Errorf("expected token 'test-token', got '%s'", client.token)
+	if client.token != testTokenClient {
+		t.Errorf("expected token '%s', got '%s'", testTokenClient, client.token)
 	}
 	if client.state != StateDisconnected {
 		t.Errorf("expected state StateDisconnected, got %d", client.state)
@@ -163,60 +171,60 @@ func TestNewClient(t *testing.T) {
 }
 
 func TestClientState(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	if client.State() != StateDisconnected {
 		t.Errorf("expected State() to return StateDisconnected, got %d", client.State())
 	}
 }
 
 func TestClientSessionID(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	if client.SessionID() != "" {
 		t.Errorf("expected SessionID() to return empty string, got '%s'", client.SessionID())
 	}
 }
 
 func TestClientSequence(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	if client.Sequence() != 0 {
 		t.Errorf("expected Sequence() to return 0, got %d", client.Sequence())
 	}
 }
 
 func TestSendIdentifyNotConnected(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	err := client.SendIdentify(context.Background())
 	if err != ErrNotConnected {
-		t.Errorf("expected ErrNotConnected, got %v", err)
+		t.Errorf(errExpectedNotConn, err)
 	}
 }
 
 func TestSendHeartbeatNotConnected(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	err := client.SendHeartbeat(context.Background())
 	if err != ErrNotConnected {
-		t.Errorf("expected ErrNotConnected, got %v", err)
+		t.Errorf(errExpectedNotConn, err)
 	}
 }
 
 func TestSendPresenceUpdateNotConnected(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	err := client.SendPresenceUpdate(context.Background(), "online")
 	if err != ErrNotConnected {
-		t.Errorf("expected ErrNotConnected, got %v", err)
+		t.Errorf(errExpectedNotConn, err)
 	}
 }
 
 func TestSendVoiceStateUpdateNotConnected(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	err := client.SendVoiceStateUpdate(context.Background(), "guild123", "channel123", false, false)
 	if err != ErrNotConnected {
-		t.Errorf("expected ErrNotConnected, got %v", err)
+		t.Errorf(errExpectedNotConn, err)
 	}
 }
 
 func TestClientClose(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	// Close should not error when not connected
 	err := client.Close()
 	if err != nil {
@@ -225,7 +233,7 @@ func TestClientClose(t *testing.T) {
 }
 
 func TestClientStateChange(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	stateChanges := make([]int, 0)
 	client.OnStateChange = func(state int) {
@@ -247,7 +255,7 @@ func TestClientStateChange(t *testing.T) {
 }
 
 func TestClientSetState(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	client.setState(StateConnecting)
 	if client.State() != StateConnecting {
@@ -261,7 +269,7 @@ func TestClientSetState(t *testing.T) {
 }
 
 func TestHandleMessage(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	// Test OpHeartbeatAck
 	ackMsg := `{"op": 11}`
@@ -286,13 +294,13 @@ func TestHandleMessage(t *testing.T) {
 }
 
 func TestHandleDispatchReady(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	readyCalled := false
 	client.OnReady = func(sessionID string) {
 		readyCalled = true
-		if sessionID != "test-session-id" {
-			t.Errorf("expected sessionID 'test-session-id', got '%s'", sessionID)
+		if sessionID != testSessionID {
+			t.Errorf("expected sessionID '%s', got '%s'", testSessionID, sessionID)
 		}
 	}
 
@@ -310,13 +318,13 @@ func TestHandleDispatchReady(t *testing.T) {
 		t.Error("expected OnReady callback to be called")
 	}
 
-	if client.SessionID() != "test-session-id" {
-		t.Errorf("expected sessionID 'test-session-id', got '%s'", client.SessionID())
+	if client.SessionID() != testSessionID {
+		t.Errorf("expected sessionID '%s', got '%s'", testSessionID, client.SessionID())
 	}
 }
 
 func TestHandleDispatchResumed(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	stateChanges := make([]int, 0)
 	client.OnStateChange = func(state int) {
@@ -334,7 +342,7 @@ func TestHandleDispatchResumed(t *testing.T) {
 }
 
 func TestHandleReconnect(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	disconnectCalled := false
 	client.OnDisconnect = func(code int, reason string) {
@@ -352,8 +360,8 @@ func TestHandleReconnect(t *testing.T) {
 }
 
 func TestHandleInvalidSession(t *testing.T) {
-	client := NewClient("test-token", nil)
-	client.sessionID = "old-session"
+	client := NewClient(testTokenClient, nil)
+	client.sessionID = testOldSession
 	client.sequence = 100
 
 	errorCalled := false
@@ -381,16 +389,18 @@ func TestHandleInvalidSession(t *testing.T) {
 }
 
 func TestHandleInvalidSessionResumable(t *testing.T) {
-	client := NewClient("test-token", nil)
-	client.sessionID = "old-session"
+	client := NewClient(testTokenClient, nil)
+	client.sessionID = testOldSession
 	client.sequence = 100
 
-	client.OnError = func(err error) {}
+	client.OnError = func(_ error) {
+		// No-op: callback required to prevent nil panic but error handling not tested here
+	}
 
 	// Resumable session
 	client.handleInvalidSession(json.RawMessage(`true`))
 
-	if client.SessionID() != "old-session" {
+	if client.SessionID() != testOldSession {
 		t.Errorf("expected sessionID to be preserved, got '%s'", client.SessionID())
 	}
 
@@ -409,11 +419,11 @@ func TestHandleHello(t *testing.T) {
 	// Connect directly to the mock server
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnectFmt, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	client.conn = conn
 	client.heartbeatStop = make(chan struct{})
 
@@ -447,7 +457,7 @@ func TestHandleHello(t *testing.T) {
 }
 
 func TestSequenceUpdates(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	// Message with sequence
 	msg := `{"op": 0, "s": 42, "t": "UNKNOWN_EVENT", "d": {}}`
@@ -468,7 +478,7 @@ func TestConnectToMockServer(t *testing.T) {
 	// Connect directly (we test the mock server, as real Connect uses hardcoded URL)
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnectFmt, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
@@ -497,10 +507,10 @@ func TestCloseWithActiveConnection(t *testing.T) {
 
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnectFmt, err)
 	}
 
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	client.conn = conn
 	client.state = StateConnected
 	client.heartbeatStop = make(chan struct{})
@@ -543,14 +553,14 @@ func TestSendIdentifyWithConnection(t *testing.T) {
 
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnectFmt, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, _ = conn.Read(ctx)
 
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	client.conn = conn
 
 	err = client.SendIdentify(ctx)
@@ -584,14 +594,14 @@ func TestSendHeartbeatWithConnection(t *testing.T) {
 
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnectFmt, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, _ = conn.Read(ctx)
 
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	client.conn = conn
 	client.sequence = 42
 
@@ -625,14 +635,14 @@ func TestSendPresenceUpdateWithConnection(t *testing.T) {
 
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnectFmt, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, _ = conn.Read(ctx)
 
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	client.conn = conn
 
 	err = client.SendPresenceUpdate(ctx, "online")
@@ -650,14 +660,14 @@ func TestSendVoiceStateUpdateWithConnection(t *testing.T) {
 
 	conn, _, err := websocket.Dial(ctx, mock.URL(), nil)
 	if err != nil {
-		t.Fatalf("failed to connect: %v", err)
+		t.Fatalf(errFailedToConnectFmt, err)
 	}
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
 	_, _, _ = conn.Read(ctx)
 
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	client.conn = conn
 
 	// With channel ID
@@ -674,7 +684,7 @@ func TestSendVoiceStateUpdateWithConnection(t *testing.T) {
 }
 
 func TestHandleMessageReconnect(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	disconnectCalled := false
 	client.OnDisconnect = func(code int, reason string) {
@@ -694,7 +704,7 @@ func TestHandleMessageReconnect(t *testing.T) {
 }
 
 func TestHandleMessageInvalidSession(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	errorCalled := false
 	client.OnError = func(err error) {
@@ -714,7 +724,7 @@ func TestHandleMessageInvalidSession(t *testing.T) {
 }
 
 func TestHandleReadErrorFatalCode(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	client.state = StateConnected
 
 	// Simulate a fatal close error by using handleReadError directly
@@ -727,7 +737,7 @@ func TestHandleReadErrorFatalCode(t *testing.T) {
 }
 
 func TestStartHeartbeatZeroInterval(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 	client.heartbeatInterval = 0
 
 	ctx := context.Background()
@@ -748,7 +758,7 @@ func TestStartHeartbeatZeroInterval(t *testing.T) {
 }
 
 func TestHandleDispatchUnknownEvent(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	// Unknown event type should not error
 	err := client.handleDispatch(context.Background(), "UNKNOWN_EVENT", json.RawMessage(`{}`))
@@ -758,7 +768,7 @@ func TestHandleDispatchUnknownEvent(t *testing.T) {
 }
 
 func TestHandleDispatchReadyInvalidJSON(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	// Invalid JSON for READY should error
 	err := client.handleDispatch(context.Background(), "READY", json.RawMessage(`{invalid`))
@@ -768,7 +778,7 @@ func TestHandleDispatchReadyInvalidJSON(t *testing.T) {
 }
 
 func TestHandleHelloInvalidJSON(t *testing.T) {
-	client := NewClient("test-token", nil)
+	client := NewClient(testTokenClient, nil)
 
 	// Invalid JSON for HELLO should error
 	err := client.handleHello(context.Background(), json.RawMessage(`{invalid`))

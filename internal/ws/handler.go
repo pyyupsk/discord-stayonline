@@ -88,14 +88,14 @@ func (h *Handler) isOriginAllowed(origin, host string) bool {
 	}
 
 	// Remove port if present for comparison
-	if idx := strings.Index(originHost, ":"); idx != -1 {
-		originHost = originHost[:idx]
+	if hostPart, _, found := strings.Cut(originHost, ":"); found {
+		originHost = hostPart
 	}
 
 	// Also check host without port
 	hostWithoutPort := host
-	if idx := strings.Index(host, ":"); idx != -1 {
-		hostWithoutPort = host[:idx]
+	if hostPart, _, found := strings.Cut(host, ":"); found {
+		hostWithoutPort = hostPart
 	}
 
 	if originHost == hostWithoutPort {
@@ -106,8 +106,8 @@ func (h *Handler) isOriginAllowed(origin, host string) bool {
 	for _, allowed := range h.allowedOrigins {
 		allowed = strings.TrimPrefix(allowed, "http://")
 		allowed = strings.TrimPrefix(allowed, "https://")
-		if idx := strings.Index(allowed, ":"); idx != -1 {
-			allowed = allowed[:idx]
+		if hostPart, _, found := strings.Cut(allowed, ":"); found {
+			allowed = hostPart
 		}
 
 		if originHost == allowed {

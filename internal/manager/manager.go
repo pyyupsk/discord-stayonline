@@ -300,122 +300,182 @@ func (m *SessionManager) runSession(session *Session) {
 	m.logger.Info("Starting session", "server_id", serverID)
 
 	for {
-		select {
-		case <-session.ctx.Done():
+		if m.shouldStopSession(session) {
 			return
-		case <-session.stopReconnect:
-			return
-		default:
 		}
 
-		// Update status
 		session.state.MarkConnecting()
 		m.notifyStatusChange(serverID, StatusConnecting, "Connecting...")
 
-		// Load config to get global status
-		cfg, err := m.store.Load()
-		if err != nil {
-			m.logger.Error("Failed to load config", "error", err)
+		status := m.loadGlobalStatus()
+		if status == "" {
 			return
 		}
-		status := string(cfg.Status)
-		if status == "" {
-			status = "online"
-		}
 
-		// Create Gateway client
-		client := gateway.NewClient(m.token, m.logger)
-		client.SetStatus(status)
-		session.client = client
+		client := m.createAndConfigureClient(session, status)
 
-		// Try to load saved session for resumption
-		if m.sessionStore != nil {
-			if savedSession, err := m.sessionStore.LoadSession(serverID); err == nil && savedSession != nil {
-				client.SetResumeData(savedSession.SessionID, savedSession.Sequence, savedSession.ResumeURL)
-				m.logger.Info("Attempting session resume", "server_id", serverID, "session_id", savedSession.SessionID)
-			}
-		}
-
-		// Set up callbacks
-		client.OnReady = func(sessionID string) {
-			session.state.MarkConnected(sessionID)
-			m.notifyStatusChange(serverID, StatusConnected, "Connected")
-
-			// Save session state for future resumption
-			if m.sessionStore != nil {
-				sid, seq, resumeURL := client.GetSessionData()
-				if sid != "" && resumeURL != "" {
-					state := config.SessionState{
-						ServerID:  serverID,
-						SessionID: sid,
-						Sequence:  seq,
-						ResumeURL: resumeURL,
-					}
-					if err := m.sessionStore.SaveSession(state); err != nil {
-						m.logger.Error("Failed to save session state", "server_id", serverID, "error", err)
-					}
-				}
-			}
-
-			// Join voice channel if configured (presence is already set in IDENTIFY)
-			if session.serverEntry.ChannelID != "" {
-				ctx, cancel := context.WithTimeout(session.ctx, 5*time.Second)
-				_ = client.SendVoiceStateUpdate(ctx, session.serverEntry.GuildID, session.serverEntry.ChannelID, true, true)
-				cancel()
-			}
-		}
-
-		client.OnDisconnect = func(code int, reason string) {
-			session.state.MarkError(reason)
-			m.notifyStatusChange(serverID, StatusError, reason)
-		}
-
-		client.OnError = func(err error) {
-			session.state.MarkError(err.Error())
-			m.notifyStatusChange(serverID, StatusError, err.Error())
-
-			// Check for fatal errors
-			if errors.Is(err, gateway.ErrFatalClose) {
-				m.logger.Error("Fatal Gateway error - stopping reconnection", "server_id", serverID, "error", err)
-				select {
-				case <-session.stopReconnect:
-				default:
-					close(session.stopReconnect)
-				}
-			}
-		}
-
-		// Connect
 		if err := client.Connect(session.ctx); err != nil {
-			session.state.MarkError(err.Error())
-			m.notifyStatusChange(serverID, StatusError, err.Error())
-
-			// Wait for reconnect with backoff
-			session.state.MarkBackoff()
-			m.notifyStatusChange(serverID, StatusBackoff, "Waiting to reconnect...")
-
-			delay := gateway.CalculateBackoff(session.state.BackoffAttempt)
-			m.logger.Info("Waiting before reconnect", "server_id", serverID, "delay", delay)
-
-			select {
-			case <-session.ctx.Done():
-				return
-			case <-session.stopReconnect:
-				return
-			case <-time.After(delay):
+			if m.handleConnectionError(session, err) {
 				continue
 			}
+			return
 		}
 
-		// Wait for disconnection or stop signal
-		select {
-		case <-session.ctx.Done():
-			client.Close()
-			return
-		case <-session.stopReconnect:
-			client.Close()
+		if m.waitForDisconnection(session, client) {
 			return
 		}
+	}
+}
+
+// shouldStopSession checks if the session should stop.
+func (m *SessionManager) shouldStopSession(session *Session) bool {
+	select {
+	case <-session.ctx.Done():
+		return true
+	case <-session.stopReconnect:
+		return true
+	default:
+		return false
+	}
+}
+
+// loadGlobalStatus loads the global status from config.
+func (m *SessionManager) loadGlobalStatus() string {
+	cfg, err := m.store.Load()
+	if err != nil {
+		m.logger.Error("Failed to load config", "error", err)
+		return ""
+	}
+	status := string(cfg.Status)
+	if status == "" {
+		status = "online"
+	}
+	return status
+}
+
+// createAndConfigureClient creates a Gateway client and sets up callbacks.
+func (m *SessionManager) createAndConfigureClient(session *Session, status string) *gateway.Client {
+	serverID := session.serverEntry.ID
+	client := gateway.NewClient(m.token, m.logger)
+	client.SetStatus(status)
+	session.client = client
+
+	m.tryResumeSession(client, serverID)
+	m.setupClientCallbacks(session, client)
+
+	return client
+}
+
+// tryResumeSession attempts to load saved session data for resumption.
+func (m *SessionManager) tryResumeSession(client *gateway.Client, serverID string) {
+	if m.sessionStore == nil {
+		return
+	}
+	savedSession, err := m.sessionStore.LoadSession(serverID)
+	if err != nil || savedSession == nil {
+		return
+	}
+	client.SetResumeData(savedSession.SessionID, savedSession.Sequence, savedSession.ResumeURL)
+	m.logger.Info("Attempting session resume", "server_id", serverID, "session_id", savedSession.SessionID)
+}
+
+// setupClientCallbacks configures the Gateway client callbacks.
+func (m *SessionManager) setupClientCallbacks(session *Session, client *gateway.Client) {
+	serverID := session.serverEntry.ID
+
+	client.OnReady = func(sessionID string) {
+		session.state.MarkConnected(sessionID)
+		m.notifyStatusChange(serverID, StatusConnected, "Connected")
+		m.saveSessionState(serverID, client)
+		m.joinVoiceChannel(session, client)
+	}
+
+	client.OnDisconnect = func(_ int, reason string) {
+		session.state.MarkError(reason)
+		m.notifyStatusChange(serverID, StatusError, reason)
+	}
+
+	client.OnError = func(err error) {
+		session.state.MarkError(err.Error())
+		m.notifyStatusChange(serverID, StatusError, err.Error())
+		m.handleFatalError(session, serverID, err)
+	}
+}
+
+// saveSessionState persists the session state for future resumption.
+func (m *SessionManager) saveSessionState(serverID string, client *gateway.Client) {
+	if m.sessionStore == nil {
+		return
+	}
+	sid, seq, resumeURL := client.GetSessionData()
+	if sid == "" || resumeURL == "" {
+		return
+	}
+	state := config.SessionState{
+		ServerID:  serverID,
+		SessionID: sid,
+		Sequence:  seq,
+		ResumeURL: resumeURL,
+	}
+	if err := m.sessionStore.SaveSession(state); err != nil {
+		m.logger.Error("Failed to save session state", "server_id", serverID, "error", err)
+	}
+}
+
+// joinVoiceChannel joins the configured voice channel.
+func (m *SessionManager) joinVoiceChannel(session *Session, client *gateway.Client) {
+	if session.serverEntry.ChannelID == "" {
+		return
+	}
+	ctx, cancel := context.WithTimeout(session.ctx, 5*time.Second)
+	defer cancel()
+	_ = client.SendVoiceStateUpdate(ctx, session.serverEntry.GuildID, session.serverEntry.ChannelID, true, true)
+}
+
+// handleFatalError handles fatal Gateway errors.
+func (m *SessionManager) handleFatalError(session *Session, serverID string, err error) {
+	if !errors.Is(err, gateway.ErrFatalClose) {
+		return
+	}
+	m.logger.Error("Fatal Gateway error - stopping reconnection", "server_id", serverID, "error", err)
+	select {
+	case <-session.stopReconnect:
+	default:
+		close(session.stopReconnect)
+	}
+}
+
+// handleConnectionError handles connection errors and returns true if should continue.
+func (m *SessionManager) handleConnectionError(session *Session, err error) bool {
+	serverID := session.serverEntry.ID
+	session.state.MarkError(err.Error())
+	m.notifyStatusChange(serverID, StatusError, err.Error())
+
+	session.state.MarkBackoff()
+	m.notifyStatusChange(serverID, StatusBackoff, "Waiting to reconnect...")
+
+	delay := gateway.CalculateBackoff(session.state.BackoffAttempt)
+	m.logger.Info("Waiting before reconnect", "server_id", serverID, "delay", delay)
+
+	select {
+	case <-session.ctx.Done():
+		return false
+	case <-session.stopReconnect:
+		return false
+	case <-time.After(delay):
+		return true
+	}
+}
+
+// waitForDisconnection waits for session end and returns true if should stop.
+func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.Client) bool {
+	select {
+	case <-session.ctx.Done():
+		client.Close()
+		return true
+	case <-session.stopReconnect:
+		client.Close()
+		return true
 	}
 }
 

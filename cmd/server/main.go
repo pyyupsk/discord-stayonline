@@ -19,54 +19,17 @@ import (
 )
 
 func main() {
-	// Load .env file if it exists (ignore error if not found)
 	_ = godotenv.Load()
 
-	// Initialize structured logger
-	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
-		Level: slog.LevelInfo,
-	}))
-	slog.SetDefault(logger)
+	logger := initLogger()
+	token := getEnvOrDefault("DISCORD_TOKEN", "")
+	port := getEnvOrDefault("PORT", "8080")
 
-	// Load DISCORD_TOKEN from environment
-	// Token is loaded via environment variable (see .env.example)
-	// For production, set DISCORD_TOKEN in your environment or .env file
-	// NOTE: The token is NEVER sent to the client or logged
-	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
 		slog.Warn("DISCORD_TOKEN not set - connections will fail until token is configured")
 	}
-	_ = token // Will be used by SessionManager
 
-	// Get port from environment or use default
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "8080"
-	}
-
-	// Initialize ConfigStore (use PostgreSQL if DATABASE_URL is set, otherwise file)
-	var store config.ConfigStore
-	var dbStore *config.DBStore
-
-	if databaseURL := os.Getenv("DATABASE_URL"); databaseURL != "" {
-		slog.Info("Using PostgreSQL for configuration storage")
-		var err error
-		dbStore, err = config.NewDBStore(databaseURL)
-		if err != nil {
-			slog.Error("Failed to connect to database", "error", err)
-			os.Exit(1)
-		}
-		store = dbStore
-	} else {
-		slog.Info("Using file for configuration storage")
-		configPath := os.Getenv("CONFIG_PATH")
-		if configPath == "" {
-			configPath = "config.json"
-		}
-		store = config.NewStore(configPath)
-	}
-
-	// Load existing config or create default
+	store, dbStore := initStore()
 	cfg, err := store.Load()
 	if err != nil {
 		slog.Error("Failed to load config", "error", err)
@@ -74,80 +37,118 @@ func main() {
 	}
 	slog.Info("Configuration loaded", "servers", len(cfg.Servers), "tos_acknowledged", cfg.TOSAcknowledged)
 
-	// Initialize WebSocket Hub with log store
-	var logStore ws.LogStore
-	if dbStore != nil {
-		logStore = &dbLogStore{db: dbStore}
-	}
-	hub := ws.NewHub(logger, logStore)
-	go hub.Run()
+	hub := initHub(logger, dbStore)
+	sessionMgr := initSessionManager(token, store, dbStore, hub, logger)
 
-	// Initialize SessionManager with session store for resumption
-	var sessionStore manager.SessionStore
-	if dbStore != nil {
-		sessionStore = &dbSessionStore{db: dbStore}
-	}
-	sessionMgr := manager.NewSessionManager(token, store, sessionStore, logger)
-
-	// Wire SessionManager status changes to WebSocket Hub
-	sessionMgr.OnStatusChange = func(serverID string, status manager.ConnectionStatus, message string) {
-		hub.BroadcastStatus(serverID, string(status), message)
-	}
-
-	// Get embedded web filesystem
 	webFS, err := discordstayonline.GetWebFS()
 	if err != nil {
 		slog.Error("Failed to get web filesystem", "error", err)
 		os.Exit(1)
 	}
 
-	// Set up HTTP router
 	router := api.NewRouter(store, sessionMgr, hub, webFS, logger)
-	handler := router.Setup()
+	srv := createServer(port, router.Setup())
 
-	// Start SessionManager auto-connect for servers with connect_on_start=true
-	go func() {
-		if err := sessionMgr.Start(); err != nil {
-			slog.Error("Failed to start session manager", "error", err)
+	go startSessionManager(sessionMgr)
+	go startHTTPServer(srv, port)
+
+	waitForShutdown()
+	shutdown(srv, sessionMgr, hub, dbStore)
+}
+
+func initLogger() *slog.Logger {
+	logger := slog.New(slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{
+		Level: slog.LevelInfo,
+	}))
+	slog.SetDefault(logger)
+	return logger
+}
+
+func getEnvOrDefault(key, defaultValue string) string {
+	if value := os.Getenv(key); value != "" {
+		return value
+	}
+	return defaultValue
+}
+
+func initStore() (config.ConfigStore, *config.DBStore) {
+	databaseURL := os.Getenv("DATABASE_URL")
+	if databaseURL != "" {
+		slog.Info("Using PostgreSQL for configuration storage")
+		dbStore, err := config.NewDBStore(databaseURL)
+		if err != nil {
+			slog.Error("Failed to connect to database", "error", err)
+			os.Exit(1)
 		}
-	}()
+		return dbStore, dbStore
+	}
 
-	// Create server with timeouts
-	srv := &http.Server{
+	slog.Info("Using file for configuration storage")
+	configPath := getEnvOrDefault("CONFIG_PATH", "config.json")
+	return config.NewStore(configPath), nil
+}
+
+func initHub(logger *slog.Logger, dbStore *config.DBStore) *ws.Hub {
+	var logStore ws.LogStore
+	if dbStore != nil {
+		logStore = &dbLogStore{db: dbStore}
+	}
+	hub := ws.NewHub(logger, logStore)
+	go hub.Run()
+	return hub
+}
+
+func initSessionManager(token string, store config.ConfigStore, dbStore *config.DBStore, hub *ws.Hub, logger *slog.Logger) *manager.SessionManager {
+	var sessionStore manager.SessionStore
+	if dbStore != nil {
+		sessionStore = &dbSessionStore{db: dbStore}
+	}
+	sessionMgr := manager.NewSessionManager(token, store, sessionStore, logger)
+	sessionMgr.OnStatusChange = func(serverID string, status manager.ConnectionStatus, message string) {
+		hub.BroadcastStatus(serverID, string(status), message)
+	}
+	return sessionMgr
+}
+
+func createServer(port string, handler http.Handler) *http.Server {
+	return &http.Server{
 		Addr:         ":" + port,
 		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
 	}
+}
 
-	// Start server in goroutine
-	go func() {
-		slog.Info("Starting server", "port", port)
-		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			slog.Error("Server error", "error", err)
-			os.Exit(1)
-		}
-	}()
+func startSessionManager(sessionMgr *manager.SessionManager) {
+	if err := sessionMgr.Start(); err != nil {
+		slog.Error("Failed to start session manager", "error", err)
+	}
+}
 
-	// Wait for interrupt signal for graceful shutdown
+func startHTTPServer(srv *http.Server, port string) {
+	slog.Info("Starting server", "port", port)
+	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		slog.Error("Server error", "error", err)
+		os.Exit(1)
+	}
+}
+
+func waitForShutdown() {
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
+}
 
+func shutdown(srv *http.Server, sessionMgr *manager.SessionManager, hub *ws.Hub, dbStore *config.DBStore) {
 	slog.Info("Shutting down server...")
 
-	// Give outstanding requests 30 seconds to complete
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// Gracefully close all Gateway connections
 	sessionMgr.Stop()
-
-	// Close WebSocket hub
 	hub.Close()
 
-	// Close database connection if using PostgreSQL
 	if dbStore != nil {
 		dbStore.Close()
 	}

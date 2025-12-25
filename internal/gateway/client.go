@@ -528,7 +528,7 @@ func (c *Client) handleHello(ctx context.Context, data json.RawMessage) error {
 }
 
 // handleDispatch processes dispatch events.
-func (c *Client) handleDispatch(ctx context.Context, eventType string, data json.RawMessage) error {
+func (c *Client) handleDispatch(_ context.Context, eventType string, data json.RawMessage) error {
 	c.logger.Debug("Received dispatch event", "type", eventType)
 
 	switch eventType {

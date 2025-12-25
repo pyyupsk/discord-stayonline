@@ -135,9 +135,41 @@ func (s *DBStore) migrate() error {
 	return err
 }
 
+// oldConfigData represents the old JSONB configuration structure.
+type oldConfigData struct {
+	Servers []struct {
+		ID             string `json:"id"`
+		GuildID        string `json:"guild_id"`
+		GuildName      string `json:"guild_name"`
+		ChannelID      string `json:"channel_id"`
+		ChannelName    string `json:"channel_name"`
+		ConnectOnStart bool   `json:"connect_on_start"`
+		Priority       int    `json:"priority"`
+	} `json:"servers"`
+	Status          string `json:"status"`
+	TOSAcknowledged bool   `json:"tos_acknowledged"`
+}
+
 // migrateFromOldSchema migrates data from the old JSONB configuration table.
 func (s *DBStore) migrateFromOldSchema() error {
-	// Check if old table exists
+	if s.shouldSkipMigration() {
+		return nil
+	}
+
+	oldConfig, ok := s.loadOldConfig()
+	if !ok {
+		return nil
+	}
+
+	if err := s.migrateSettings(oldConfig); err != nil {
+		return err
+	}
+
+	return s.migrateServers(oldConfig)
+}
+
+// shouldSkipMigration checks if migration should be skipped.
+func (s *DBStore) shouldSkipMigration() bool {
 	var exists bool
 	err := s.db.QueryRow(`
 		SELECT EXISTS (
@@ -146,80 +178,53 @@ func (s *DBStore) migrateFromOldSchema() error {
 		)
 	`).Scan(&exists)
 	if err != nil || !exists {
-		return nil // No old table, nothing to migrate
+		return true
 	}
 
-	// Check if already migrated (settings has data)
-	var settingsCount int
-	err = s.db.QueryRow(`SELECT COUNT(*) FROM settings`).Scan(&settingsCount)
-	if err != nil {
-		return nil
-	}
+	var settingsCount, serversCount int
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM settings`).Scan(&settingsCount)
+	_ = s.db.QueryRow(`SELECT COUNT(*) FROM servers`).Scan(&serversCount)
 
-	// Check if servers table has data
-	var serversCount int
-	err = s.db.QueryRow(`SELECT COUNT(*) FROM servers`).Scan(&serversCount)
-	if err != nil {
-		return nil
-	}
+	return settingsCount > 0 || serversCount > 0
+}
 
-	// If new tables already have data, skip migration
-	if settingsCount > 0 || serversCount > 0 {
-		return nil
-	}
-
-	// Read old configuration
+// loadOldConfig loads and parses the old configuration.
+func (s *DBStore) loadOldConfig() (*oldConfigData, bool) {
 	var data []byte
-	err = s.db.QueryRow("SELECT data FROM configuration WHERE id = 1").Scan(&data)
+	err := s.db.QueryRow("SELECT data FROM configuration WHERE id = 1").Scan(&data)
 	if err != nil {
-		if err == sql.ErrNoRows {
-			return nil // No data to migrate
-		}
-		return nil // Ignore errors, old table might have different structure
+		return nil, false
 	}
 
-	// Parse old config
-	var oldConfig struct {
-		Servers []struct {
-			ID             string `json:"id"`
-			GuildID        string `json:"guild_id"`
-			GuildName      string `json:"guild_name"`
-			ChannelID      string `json:"channel_id"`
-			ChannelName    string `json:"channel_name"`
-			ConnectOnStart bool   `json:"connect_on_start"`
-			Priority       int    `json:"priority"`
-		} `json:"servers"`
-		Status          string `json:"status"`
-		TOSAcknowledged bool   `json:"tos_acknowledged"`
-	}
-
+	var oldConfig oldConfigData
 	if err := json.Unmarshal(data, &oldConfig); err != nil {
-		return nil // Ignore parse errors
+		return nil, false
 	}
 
-	// Migrate settings
+	return &oldConfig, true
+}
+
+// migrateSettings migrates settings from old config.
+func (s *DBStore) migrateSettings(oldConfig *oldConfigData) error {
 	status := oldConfig.Status
 	if status == "" {
 		status = "online"
 	}
-	_, err = s.db.Exec(`
+	_, err := s.db.Exec(`
 		INSERT INTO settings (id, status, tos_acknowledged)
 		VALUES (1, $1, $2)
 		ON CONFLICT (id) DO UPDATE SET
 			status = EXCLUDED.status,
 			tos_acknowledged = EXCLUDED.tos_acknowledged
 	`, status, oldConfig.TOSAcknowledged)
-	if err != nil {
-		return err
-	}
+	return err
+}
 
-	// Migrate servers
+// migrateServers migrates servers from old config.
+func (s *DBStore) migrateServers(oldConfig *oldConfigData) error {
 	for _, srv := range oldConfig.Servers {
-		priority := srv.Priority
-		if priority < 1 {
-			priority = 1
-		}
-		_, err = s.db.Exec(`
+		priority := max(srv.Priority, 1)
+		_, err := s.db.Exec(`
 			INSERT INTO servers (id, guild_id, guild_name, channel_id, channel_name, connect_on_start, priority)
 			VALUES ($1, $2, $3, $4, $5, $6, $7)
 			ON CONFLICT (id) DO NOTHING
@@ -228,7 +233,6 @@ func (s *DBStore) migrateFromOldSchema() error {
 			return err
 		}
 	}
-
 	return nil
 }
 
@@ -284,12 +288,10 @@ func (s *DBStore) Save(cfg *Configuration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	// Validate before saving
 	if err := cfg.Validate(); err != nil {
 		return err
 	}
 
-	// Start transaction
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
@@ -300,12 +302,24 @@ func (s *DBStore) Save(cfg *Configuration) error {
 		}
 	}()
 
-	// Update settings
+	if err = s.saveSettings(tx, cfg); err != nil {
+		return err
+	}
+
+	if err = s.syncServers(tx, cfg.Servers); err != nil {
+		return err
+	}
+
+	return tx.Commit()
+}
+
+// saveSettings saves global settings to the database.
+func (s *DBStore) saveSettings(tx *sql.Tx, cfg *Configuration) error {
 	status := string(cfg.Status)
 	if status == "" {
 		status = "online"
 	}
-	_, err = tx.Exec(`
+	_, err := tx.Exec(`
 		INSERT INTO settings (id, status, tos_acknowledged, updated_at)
 		VALUES (1, $1, $2, NOW())
 		ON CONFLICT (id) DO UPDATE SET
@@ -313,45 +327,63 @@ func (s *DBStore) Save(cfg *Configuration) error {
 			tos_acknowledged = EXCLUDED.tos_acknowledged,
 			updated_at = NOW()
 	`, status, cfg.TOSAcknowledged)
+	return err
+}
+
+// syncServers synchronizes servers in the database with the provided list.
+func (s *DBStore) syncServers(tx *sql.Tx, servers []ServerEntry) error {
+	existingIDs, err := s.getExistingServerIDs(tx)
 	if err != nil {
 		return err
 	}
 
-	// Get existing server IDs
-	existingIDs := make(map[string]bool)
-	rows, err := tx.Query(`SELECT id FROM servers`)
-	if err != nil {
-		return err
-	}
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			rows.Close()
-			return err
-		}
-		existingIDs[id] = true
-	}
-	rows.Close()
-
-	// Track which IDs are in the new config
 	newIDs := make(map[string]bool)
-	for _, srv := range cfg.Servers {
+	for _, srv := range servers {
 		newIDs[srv.ID] = true
 	}
 
-	// Delete servers not in new config
+	if err := s.deleteRemovedServers(tx, existingIDs, newIDs); err != nil {
+		return err
+	}
+
+	return s.upsertServers(tx, servers)
+}
+
+// getExistingServerIDs returns a set of existing server IDs.
+func (s *DBStore) getExistingServerIDs(tx *sql.Tx) (map[string]bool, error) {
+	existingIDs := make(map[string]bool)
+	rows, err := tx.Query(`SELECT id FROM servers`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		existingIDs[id] = true
+	}
+	return existingIDs, rows.Err()
+}
+
+// deleteRemovedServers deletes servers that are no longer in the config.
+func (s *DBStore) deleteRemovedServers(tx *sql.Tx, existingIDs, newIDs map[string]bool) error {
 	for id := range existingIDs {
 		if !newIDs[id] {
-			_, err = tx.Exec(`DELETE FROM servers WHERE id = $1`, id)
-			if err != nil {
+			if _, err := tx.Exec(`DELETE FROM servers WHERE id = $1`, id); err != nil {
 				return err
 			}
 		}
 	}
+	return nil
+}
 
-	// Upsert servers
-	for _, srv := range cfg.Servers {
-		_, err = tx.Exec(`
+// upsertServers inserts or updates servers in the database.
+func (s *DBStore) upsertServers(tx *sql.Tx, servers []ServerEntry) error {
+	for _, srv := range servers {
+		_, err := tx.Exec(`
 			INSERT INTO servers (id, guild_id, guild_name, channel_id, channel_name, connect_on_start, priority, updated_at)
 			VALUES ($1, $2, NULLIF($3, ''), $4, NULLIF($5, ''), $6, $7, NOW())
 			ON CONFLICT (id) DO UPDATE SET
@@ -367,8 +399,7 @@ func (s *DBStore) Save(cfg *Configuration) error {
 			return err
 		}
 	}
-
-	return tx.Commit()
+	return nil
 }
 
 // Close closes the database connection.

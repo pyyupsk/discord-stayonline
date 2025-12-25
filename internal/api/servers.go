@@ -142,7 +142,7 @@ func (h *ServersHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	newStatus, _ := h.manager.GetStatus(serverID)
 
 	h.logger.Info("Action executed", "server_id", serverID, "action", req.Action, "new_status", newStatus)
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"success":    true,
 		"server_id":  serverID,
 		"action":     req.Action,

@@ -35,9 +35,7 @@ func CalculateBackoff(attempt int) time.Duration {
 	delay := BaseDelay * time.Duration(1<<uint(attempt))
 
 	// Cap at maximum delay
-	if delay > MaxDelay {
-		delay = MaxDelay
-	}
+	delay = min(delay, MaxDelay)
 
 	// Add jitter: 0-50% of the delay
 	jitter := randomJitter(delay)

@@ -104,7 +104,7 @@ func (c *Client) WritePump(ctx context.Context) {
 }
 
 // handleMessage processes an incoming client message.
-func (c *Client) handleMessage(ctx context.Context, data []byte) {
+func (c *Client) handleMessage(_ context.Context, data []byte) {
 	var msg struct {
 		Type     string `json:"type"`
 		Channel  string `json:"channel,omitempty"`

@@ -138,7 +138,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 	})
 
 	h.logger.Info("Successful login")
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Logged in successfully",
 	})
@@ -158,7 +158,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 	})
 
 	h.logger.Info("User logged out")
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"success": true,
 		"message": "Logged out successfully",
 	})
@@ -168,7 +168,7 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
 	// If auth not enabled, always authenticated
 	if !h.middleware.IsEnabled() {
-		writeJSON(w, http.StatusOK, map[string]interface{}{
+		writeJSON(w, http.StatusOK, map[string]any{
 			"authenticated": true,
 			"auth_required": false,
 		})
@@ -179,7 +179,7 @@ func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
 	cookie, err := r.Cookie(cookieName)
 	authenticated := err == nil && h.middleware.validateKey(cookie.Value)
 
-	writeJSON(w, http.StatusOK, map[string]interface{}{
+	writeJSON(w, http.StatusOK, map[string]any{
 		"authenticated": authenticated,
 		"auth_required": true,
 	})
