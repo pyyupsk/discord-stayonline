@@ -48,7 +48,7 @@ func NewRouter(store config.ConfigStore, mgr *manager.SessionManager, hub *ws.Hu
 // Setup configures all HTTP routes.
 func (r *Router) Setup() http.Handler {
 	// Health endpoint (public)
-	healthHandler := NewHealthHandler()
+	healthHandler := NewHealthHandler(r.manager, r.hub)
 	r.mux.HandleFunc("GET /health", healthHandler.Health)
 	r.mux.HandleFunc("HEAD /health", healthHandler.Health)
 
