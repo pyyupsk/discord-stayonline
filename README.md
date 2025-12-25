@@ -169,7 +169,7 @@ GET /api/config
 Response: {"servers": [...], "status": "online|idle|dnd", "tos_acknowledged": bool}
 
 POST /api/config
-Body: {"servers": [...], "status": "..."}  // Full replacement (max 15 entries)
+Body: {"servers": [...], "status": "..."}  // Full replacement (max 35 entries)
 
 PUT /api/config
 Body: {"servers": [...], "status": "..."}  // Partial update, merge by ID

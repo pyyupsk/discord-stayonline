@@ -72,7 +72,7 @@ func (h *ConfigHandler) ReplaceConfig(w http.ResponseWriter, r *http.Request) {
 	if len(input.Servers) > config.MaxServerEntries {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "validation_error",
-			"message": "Maximum 15 server entries allowed",
+			"message": "Maximum 35 server entries allowed",
 		})
 		return
 	}
@@ -188,7 +188,7 @@ func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 	if len(cfg.Servers) > config.MaxServerEntries {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "validation_error",
-			"message": "Maximum 15 server entries allowed",
+			"message": "Maximum 35 server entries allowed",
 		})
 		return
 	}

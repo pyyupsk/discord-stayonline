@@ -82,8 +82,12 @@ func main() {
 	hub := ws.NewHub(logger, logStore)
 	go hub.Run()
 
-	// Initialize SessionManager
-	sessionMgr := manager.NewSessionManager(token, store, logger)
+	// Initialize SessionManager with session store for resumption
+	var sessionStore manager.SessionStore
+	if dbStore != nil {
+		sessionStore = &dbSessionStore{db: dbStore}
+	}
+	sessionMgr := manager.NewSessionManager(token, store, sessionStore, logger)
 
 	// Wire SessionManager status changes to WebSocket Hub
 	sessionMgr.OnStatusChange = func(serverID string, status manager.ConnectionStatus, message string) {
@@ -180,4 +184,25 @@ func (s *dbLogStore) GetLogs(level string) ([]ws.LogEntry, error) {
 		}
 	}
 	return result, nil
+}
+
+// dbSessionStore adapts config.DBStore to manager.SessionStore interface.
+type dbSessionStore struct {
+	db *config.DBStore
+}
+
+func (s *dbSessionStore) SaveSession(state config.SessionState) error {
+	return s.db.SaveSession(state)
+}
+
+func (s *dbSessionStore) LoadSession(serverID string) (*config.SessionState, error) {
+	return s.db.LoadSession(serverID)
+}
+
+func (s *dbSessionStore) DeleteSession(serverID string) error {
+	return s.db.DeleteSession(serverID)
+}
+
+func (s *dbSessionStore) UpdateSessionSequence(serverID string, sequence int) error {
+	return s.db.UpdateSessionSequence(serverID, sequence)
 }

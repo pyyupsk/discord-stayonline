@@ -15,17 +15,26 @@ import (
 // Common errors
 var (
 	ErrServerNotFound     = errors.New("server not found")
-	ErrTooManyConnections = errors.New("maximum 15 connections allowed")
+	ErrTooManyConnections = errors.New("maximum 35 connections allowed")
 	ErrTOSNotAcknowledged = errors.New("TOS not acknowledged")
 	ErrAlreadyConnected   = errors.New("already connected")
 	ErrNotConnected       = errors.New("not connected")
 )
 
+// SessionStore interface for persisting Gateway session state.
+type SessionStore interface {
+	SaveSession(state config.SessionState) error
+	LoadSession(serverID string) (*config.SessionState, error)
+	DeleteSession(serverID string) error
+	UpdateSessionSequence(serverID string, sequence int) error
+}
+
 // SessionManager manages multiple Gateway connections.
 type SessionManager struct {
-	token  string
-	store  config.ConfigStore
-	logger *slog.Logger
+	token        string
+	store        config.ConfigStore
+	sessionStore SessionStore
+	logger       *slog.Logger
 
 	sessions map[string]*Session
 	mu       sync.RWMutex
@@ -51,18 +60,19 @@ type Session struct {
 }
 
 // NewSessionManager creates a new session manager.
-func NewSessionManager(token string, store config.ConfigStore, logger *slog.Logger) *SessionManager {
+func NewSessionManager(token string, store config.ConfigStore, sessionStore SessionStore, logger *slog.Logger) *SessionManager {
 	if logger == nil {
 		logger = slog.Default()
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &SessionManager{
-		token:    token,
-		store:    store,
-		logger:   logger.With("component", "manager"),
-		sessions: make(map[string]*Session),
-		ctx:      ctx,
-		cancel:   cancel,
+		token:        token,
+		store:        store,
+		sessionStore: sessionStore,
+		logger:       logger.With("component", "manager"),
+		sessions:     make(map[string]*Session),
+		ctx:          ctx,
+		cancel:       cancel,
 	}
 }
 
@@ -87,18 +97,11 @@ func (m *SessionManager) Start() error {
 		}
 	}
 
-	// Auto-connect with staggered delays to avoid Discord rate limits
-	// Discord limits IDENTIFY to ~1 per 5 seconds per token
-	// Initial delay allows old container sessions to close during rolling deploys
+	// Auto-connect with session resumption (no stagger needed)
+	// Sessions are resumed from database, so no rate limit issues
 	if len(toConnect) > 0 {
 		go func() {
-			// Wait for old container to fully stop (rolling deploy overlap)
-			time.Sleep(5 * time.Second)
-
-			for i, s := range toConnect {
-				if i > 0 {
-					time.Sleep(2 * time.Second)
-				}
+			for _, s := range toConnect {
 				if err := m.Join(s.ID); err != nil {
 					m.logger.Error("Failed to auto-connect", "server_id", s.ID, "error", err)
 				}
@@ -325,10 +328,34 @@ func (m *SessionManager) runSession(session *Session) {
 		client.SetStatus(status)
 		session.client = client
 
+		// Try to load saved session for resumption
+		if m.sessionStore != nil {
+			if savedSession, err := m.sessionStore.LoadSession(serverID); err == nil && savedSession != nil {
+				client.SetResumeData(savedSession.SessionID, savedSession.Sequence, savedSession.ResumeURL)
+				m.logger.Info("Attempting session resume", "server_id", serverID, "session_id", savedSession.SessionID)
+			}
+		}
+
 		// Set up callbacks
 		client.OnReady = func(sessionID string) {
 			session.state.MarkConnected(sessionID)
 			m.notifyStatusChange(serverID, StatusConnected, "Connected")
+
+			// Save session state for future resumption
+			if m.sessionStore != nil {
+				sid, seq, resumeURL := client.GetSessionData()
+				if sid != "" && resumeURL != "" {
+					state := config.SessionState{
+						ServerID:  serverID,
+						SessionID: sid,
+						Sequence:  seq,
+						ResumeURL: resumeURL,
+					}
+					if err := m.sessionStore.SaveSession(state); err != nil {
+						m.logger.Error("Failed to save session state", "server_id", serverID, "error", err)
+					}
+				}
+			}
 
 			// Join voice channel if configured (presence is already set in IDENTIFY)
 			if session.serverEntry.ChannelID != "" {

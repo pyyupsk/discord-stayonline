@@ -216,7 +216,7 @@ async function handleStatusChange(status: Status) {
         <section class="space-y-4">
           <div class="flex items-center justify-between">
             <h2 class="text-lg font-medium">Server Connections</h2>
-            <Button size="sm" :disabled="config.servers.length >= 15" @click="handleAddServer">
+            <Button size="sm" :disabled="config.servers.length >= 35" @click="handleAddServer">
               <Plus />
               Add Server
             </Button>

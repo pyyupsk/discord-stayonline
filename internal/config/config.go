@@ -36,7 +36,7 @@ type ServerEntry struct {
 
 // Configuration represents the complete persisted configuration state.
 type Configuration struct {
-	// Servers is the list of configured server entries (max 15)
+	// Servers is the list of configured server entries (max 35)
 	Servers []ServerEntry `json:"servers"`
 
 	// Status is the global presence status for the account (online, idle, dnd)
@@ -47,7 +47,7 @@ type Configuration struct {
 }
 
 // MaxServerEntries is the maximum number of server entries allowed.
-const MaxServerEntries = 15
+const MaxServerEntries = 35
 
 // Validate checks if the server entry has valid values.
 func (s *ServerEntry) Validate() error {

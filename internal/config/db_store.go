@@ -106,6 +106,20 @@ func (s *DBStore) migrate() error {
 		return err
 	}
 
+	// Create sessions table for Discord Gateway session resumption
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS sessions (
+			server_id VARCHAR(32) PRIMARY KEY REFERENCES servers(id) ON DELETE CASCADE,
+			session_id VARCHAR(64) NOT NULL,
+			sequence INTEGER NOT NULL DEFAULT 0,
+			resume_url VARCHAR(255) NOT NULL,
+			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	// Migrate from old schema if exists
 	if err := s.migrateFromOldSchema(); err != nil {
 		return err
@@ -440,5 +454,71 @@ func (s *DBStore) ClearLogs() error {
 	defer s.mu.Unlock()
 
 	_, err := s.db.Exec(`DELETE FROM logs`)
+	return err
+}
+
+// SessionState holds Discord Gateway session data for resumption.
+type SessionState struct {
+	ServerID  string `json:"server_id"`
+	SessionID string `json:"session_id"`
+	Sequence  int    `json:"sequence"`
+	ResumeURL string `json:"resume_url"`
+}
+
+// SaveSession persists session state for later resumption.
+func (s *DBStore) SaveSession(state SessionState) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		INSERT INTO sessions (server_id, session_id, sequence, resume_url, updated_at)
+		VALUES ($1, $2, $3, $4, NOW())
+		ON CONFLICT (server_id) DO UPDATE SET
+			session_id = EXCLUDED.session_id,
+			sequence = EXCLUDED.sequence,
+			resume_url = EXCLUDED.resume_url,
+			updated_at = NOW()
+	`, state.ServerID, state.SessionID, state.Sequence, state.ResumeURL)
+	return err
+}
+
+// LoadSession retrieves saved session state for resumption.
+func (s *DBStore) LoadSession(serverID string) (*SessionState, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var state SessionState
+	err := s.db.QueryRow(`
+		SELECT server_id, session_id, sequence, resume_url FROM sessions
+		WHERE server_id = $1
+	`, serverID).Scan(&state.ServerID, &state.SessionID, &state.Sequence, &state.ResumeURL)
+
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &state, nil
+}
+
+// DeleteSession removes session state.
+func (s *DBStore) DeleteSession(serverID string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`DELETE FROM sessions WHERE server_id = $1`, serverID)
+	return err
+}
+
+// UpdateSessionSequence updates just the sequence number for a session.
+func (s *DBStore) UpdateSessionSequence(serverID string, sequence int) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		UPDATE sessions SET sequence = $1, updated_at = NOW()
+		WHERE server_id = $2
+	`, sequence, serverID)
 	return err
 }

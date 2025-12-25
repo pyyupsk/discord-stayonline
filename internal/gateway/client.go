@@ -67,10 +67,13 @@ type Client struct {
 	state int
 	mu    sync.RWMutex
 
-	// Session state
-	sessionID string
-	sequence  int
-	resumeURL string
+	// Session state for resumption
+	sessionID        string
+	sequence         int
+	resumeURL        string
+	resumeSessionID  string // Set before Connect to attempt resume
+	resumeSequence   int
+	resumeGatewayURL string
 
 	// Heartbeat management
 	heartbeatInterval time.Duration
@@ -114,7 +117,33 @@ func (c *Client) SetStatus(status string) {
 	c.status = status
 }
 
+// SetResumeData sets session data for attempting to resume on Connect.
+func (c *Client) SetResumeData(sessionID string, sequence int, resumeURL string) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.resumeSessionID = sessionID
+	c.resumeSequence = sequence
+	c.resumeGatewayURL = resumeURL
+}
+
+// GetSessionData returns current session data for persistence.
+func (c *Client) GetSessionData() (sessionID string, sequence int, resumeURL string) {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.sessionID, c.sequence, c.resumeURL
+}
+
+// ClearResumeData clears resume data (call after failed resume).
+func (c *Client) ClearResumeData() {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	c.resumeSessionID = ""
+	c.resumeSequence = 0
+	c.resumeGatewayURL = ""
+}
+
 // Connect establishes a connection to the Discord Gateway.
+// If resume data was set via SetResumeData, it will attempt to resume the session.
 func (c *Client) Connect(ctx context.Context) error {
 	c.mu.Lock()
 	if c.state == StateConnected {
@@ -122,14 +151,21 @@ func (c *Client) Connect(ctx context.Context) error {
 		return nil
 	}
 	c.state = StateConnecting
+	resumeURL := c.resumeGatewayURL
 	c.mu.Unlock()
 
 	c.notifyStateChange(StateConnecting)
 
-	// Connect to Gateway
-	c.logger.Info("Connecting to Discord Gateway", "url", GatewayURL)
+	// Use resume URL if available, otherwise use default gateway
+	gatewayURL := GatewayURL
+	if resumeURL != "" {
+		gatewayURL = resumeURL + "/?v=10&encoding=json"
+		c.logger.Info("Resuming Discord Gateway session", "url", gatewayURL)
+	} else {
+		c.logger.Info("Connecting to Discord Gateway", "url", gatewayURL)
+	}
 
-	conn, _, err := websocket.Dial(ctx, GatewayURL, &websocket.DialOptions{
+	conn, _, err := websocket.Dial(ctx, gatewayURL, &websocket.DialOptions{
 		CompressionMode: websocket.CompressionDisabled,
 	})
 	if err != nil {
@@ -253,6 +289,39 @@ func (c *Client) SendIdentifyWithStatus(ctx context.Context, status string) erro
 	}
 
 	c.logger.Debug("Sending IDENTIFY", "status", status)
+	return conn.Write(ctx, websocket.MessageText, data)
+}
+
+// sendResume sends the RESUME payload to continue a previous session.
+func (c *Client) sendResume(ctx context.Context) error {
+	c.mu.RLock()
+	conn := c.conn
+	sessionID := c.resumeSessionID
+	seq := c.resumeSequence
+	c.mu.RUnlock()
+
+	if conn == nil {
+		return ErrNotConnected
+	}
+
+	resume := struct {
+		Op   int        `json:"op"`
+		Data ResumeData `json:"d"`
+	}{
+		Op: OpResume,
+		Data: ResumeData{
+			Token:     c.token,
+			SessionID: sessionID,
+			Sequence:  seq,
+		},
+	}
+
+	data, err := json.Marshal(resume)
+	if err != nil {
+		return fmt.Errorf("marshal resume: %w", err)
+	}
+
+	c.logger.Info("Sending RESUME", "session_id", sessionID, "sequence", seq)
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
@@ -443,6 +512,7 @@ func (c *Client) handleHello(ctx context.Context, data json.RawMessage) error {
 
 	c.mu.Lock()
 	c.heartbeatInterval = time.Duration(hello.HeartbeatInterval) * time.Millisecond
+	resumeSessionID := c.resumeSessionID
 	c.mu.Unlock()
 
 	c.logger.Info("Received HELLO", "heartbeat_interval_ms", hello.HeartbeatInterval)
@@ -450,7 +520,10 @@ func (c *Client) handleHello(ctx context.Context, data json.RawMessage) error {
 	// Start heartbeat goroutine
 	go c.startHeartbeat(ctx)
 
-	// Send IDENTIFY
+	// Send RESUME if we have session data, otherwise IDENTIFY
+	if resumeSessionID != "" {
+		return c.sendResume(ctx)
+	}
 	return c.SendIdentify(ctx)
 }
 
@@ -479,9 +552,21 @@ func (c *Client) handleDispatch(ctx context.Context, eventType string, data json
 		}
 
 	case "RESUMED":
-		c.logger.Info("Session resumed successfully")
-		c.setState(StateConnected)
+		c.mu.Lock()
+		// Copy resume data to active session
+		c.sessionID = c.resumeSessionID
+		c.sequence = c.resumeSequence
+		// Keep resumeURL from original session
+		c.state = StateConnected
+		sessionID := c.sessionID
+		c.mu.Unlock()
+
+		c.logger.Info("Session resumed successfully", "session_id", sessionID)
 		c.notifyStateChange(StateConnected)
+
+		if c.OnReady != nil {
+			c.OnReady(sessionID)
+		}
 	}
 
 	return nil

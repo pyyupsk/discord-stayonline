@@ -2,6 +2,7 @@ package tests
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
@@ -155,13 +156,13 @@ func TestConfigStoreSaveValidation(t *testing.T) {
 	// Test saving config with too many servers
 	t.Run("save fails with too many servers", func(t *testing.T) {
 		cfg := &config.Configuration{
-			Servers: make([]config.ServerEntry, 16), // One more than max
+			Servers: make([]config.ServerEntry, config.MaxServerEntries+1), // One more than max
 			Status:  config.StatusOnline,
 		}
 		// Fill with valid entries
 		for i := range cfg.Servers {
 			cfg.Servers[i] = config.ServerEntry{
-				ID:             "test-" + string(rune('A'+i)),
+				ID:             fmt.Sprintf("test-%d", i),
 				GuildID:        "123456789012345678",
 				ChannelID:      "234567890123456789",
 				ConnectOnStart: true,
