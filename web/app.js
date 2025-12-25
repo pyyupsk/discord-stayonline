@@ -41,10 +41,10 @@
         }
 
         // Check TOS acknowledgment
-        if (!config.tos_acknowledged) {
-            showTOSModal();
-        } else {
+        if (config.tos_acknowledged) {
             showApp();
+        } else {
+            showTOSModal();
         }
 
         // Set up event listeners
@@ -360,8 +360,8 @@
     function connectWebSocket() {
         if (ws && ws.readyState === WebSocket.OPEN) return;
 
-        const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-        const wsUrl = `${protocol}//${window.location.host}/ws`;
+        const protocol = globalThis.location.protocol === 'https:' ? 'wss:' : 'ws:';
+        const wsUrl = `${protocol}//${globalThis.location.host}/ws`;
 
         updateConnectionStatus('connecting');
 
@@ -392,7 +392,7 @@
                 try {
                     const msg = JSON.parse(event.data);
                     handleWebSocketMessage(msg);
-                } catch (error) {
+                } catch {
                     log('error', 'Failed to parse WebSocket message');
                 }
             };
@@ -465,7 +465,7 @@
 
     // Utilities
     function generateId() {
-        return 'xxxxxxxx'.replace(/x/g, () => {
+        return 'xxxxxxxx'.replaceAll('x', () => {
             return Math.floor(Math.random() * 16).toString(16);
         });
     }
@@ -477,7 +477,7 @@
     }
 
     // Expose public API
-    window.app = {
+    globalThis.app = {
         joinServer,
         rejoinServer,
         exitServer,

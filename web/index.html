@@ -8,7 +8,7 @@
 </head>
 <body>
     <!-- TOS Modal -->
-    <div id="tos-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tos-title">
+    <dialog id="tos-modal" class="modal" aria-modal="true" aria-labelledby="tos-title">
         <div class="modal-content">
             <h1 id="tos-title">Terms of Service Warning</h1>
             <div class="warning-box">
@@ -28,7 +28,7 @@
             </div>
             <button id="tos-acknowledge-btn" class="btn btn-danger">I Understand and Accept the Risks</button>
         </div>
-    </div>
+    </dialog>
 
     <!-- Main Application -->
     <div id="app" class="hidden">
@@ -100,7 +100,7 @@
     </div>
 
     <!-- Action Confirmation Modal -->
-    <div id="confirm-modal" class="modal hidden" role="dialog" aria-modal="true">
+    <dialog id="confirm-modal" class="modal hidden" aria-modal="true">
         <div class="modal-content modal-small">
             <h2 id="confirm-title">Confirm Action</h2>
             <p id="confirm-message"></p>
@@ -109,7 +109,7 @@
                 <button id="confirm-no-btn" class="btn btn-secondary">No</button>
             </div>
         </div>
-    </div>
+    </dialog>
 
     <script src="app.js"></script>
 </body>

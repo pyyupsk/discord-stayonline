@@ -9,6 +9,7 @@ A self-hosted service that maintains Discord account presence by managing persis
 > This tool uses Discord user tokens to maintain presence status. Using user tokens with automated tools **may violate Discord's Terms of Service** and could result in **account suspension or termination**.
 >
 > By using this software, you acknowledge:
+>
 > - You understand the risks involved with using user tokens
 > - You accept full responsibility for any consequences to your Discord account
 > - The authors are not responsible for any actions taken against your account
@@ -44,7 +45,7 @@ cp .env.example .env
 make run
 ```
 
-Open http://localhost:8080 in your browser.
+Open <http://localhost:8080> in your browser.
 
 ### Docker
 
@@ -58,11 +59,11 @@ docker run -d \
 
 ## Environment Variables
 
-| Variable | Required | Default | Description |
-| -------- | -------- | ------- | ----------- |
-| `DISCORD_TOKEN` | Yes | - | Your Discord user token |
-| `PORT` | No | `8080` | HTTP server port |
-| `ALLOWED_ORIGINS` | No | `localhost` | Comma-separated allowed origins for WebSocket |
+| Variable          | Required | Default     | Description                                   |
+| ----------------- | -------- | ----------- | --------------------------------------------- |
+| `DISCORD_TOKEN`   | Yes      | -           | Your Discord user token                       |
+| `PORT`            | No       | `8080`      | HTTP server port                              |
+| `ALLOWED_ORIGINS` | No       | `localhost` | Comma-separated allowed origins for WebSocket |
 
 ## Getting Your Discord Token
 
@@ -78,7 +79,7 @@ docker run -d \
 
 Set up UptimeRobot or similar to ping:
 
-```
+```http
 GET http://your-server:8080/health
 ```
 
@@ -100,9 +101,53 @@ make fmt
 make lint
 ```
 
+## API Reference
+
+### Health Check
+
+```http
+GET /health
+Response: 200 OK, body: "OK"
+```
+
+### TOS Acknowledgment
+
+```http
+POST /api/acknowledge-tos
+Body: {"acknowledged": true}
+Response: 200 OK
+```
+
+### Configuration
+
+```http
+GET /api/config
+Response: {"servers": [...], "tos_acknowledged": bool}
+
+POST /api/config
+Body: {"servers": [...]}  // Full replacement (max 15 entries)
+
+PUT /api/config
+Body: {"servers": [...]}  // Partial update, merge by ID
+```
+
+### Server Actions
+
+```http
+POST /api/servers/{id}/action
+Body: {"action": "join" | "rejoin" | "exit"}
+```
+
+### WebSocket Status Updates
+
+```http
+WS /ws
+Messages: {"type": "status", "server_id": "...", "status": "...", "message": "..."}
+```
+
 ## Architecture
 
-```
+```filestree
 cmd/server/         - Entry point
 internal/
   config/           - Configuration types and persistence
@@ -114,6 +159,16 @@ internal/
 web/                - Frontend assets (HTML, JS, CSS)
 tests/              - Integration tests
 ```
+
+### Connection States
+
+| Status         | Description                              |
+| -------------- | ---------------------------------------- |
+| `disconnected` | Not connected                            |
+| `connecting`   | Attempting to connect                    |
+| `connected`    | Successfully connected and authenticated |
+| `error`        | Connection failed with an error          |
+| `backoff`      | Waiting before reconnect attempt         |
 
 ## License
 

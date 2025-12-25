@@ -1,3 +1,4 @@
+// Package api provides HTTP handlers for the Discord presence service REST API.
 package api
 
 import (

@@ -39,11 +39,11 @@ This guide explains how to deploy Discord Stay Online to [Render](https://render
 
 ## Environment Variables
 
-| Variable | Required | Description |
-| -------- | -------- | ----------- |
-| `DISCORD_TOKEN` | Yes | Your Discord user token (Secret) |
-| `PORT` | No | HTTP port (Render sets this automatically) |
-| `ALLOWED_ORIGINS` | No | Comma-separated allowed origins for WebSocket |
+| Variable          | Required | Description                                   |
+| ----------------- | -------- | --------------------------------------------- |
+| `DISCORD_TOKEN`   | Yes      | Your Discord user token (Secret)              |
+| `PORT`            | No       | HTTP port (Render sets this automatically)    |
+| `ALLOWED_ORIGINS` | No       | Comma-separated allowed origins for WebSocket |
 
 ## Important Notes
 
@@ -54,6 +54,7 @@ This guide explains how to deploy Discord Stay Online to [Render](https://render
 ## Accessing the Service
 
 After deployment:
+
 1. Wait for the service to start (shows "Live" in dashboard)
 2. Click the service URL (e.g., `https://discord-stayonline-xxxx.onrender.com`)
 3. Accept the TOS warning
@@ -62,7 +63,8 @@ After deployment:
 ## Monitoring
 
 Set up [UptimeRobot](https://uptimerobot.com) or similar to monitor:
-```
+
+```http
 GET https://your-service.onrender.com/health
 ```
 
@@ -71,11 +73,13 @@ Expected response: `200 OK` with body `OK`
 ## Troubleshooting
 
 ### Service Keeps Restarting
+
 - Check logs in Render dashboard
 - Verify `DISCORD_TOKEN` is set correctly
 - Token may be invalid or expired
 
 ### Cannot Connect
+
 - Ensure the service shows "Live" status
 - Check browser console for WebSocket errors
 - Verify `ALLOWED_ORIGINS` includes your domain

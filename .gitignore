@@ -6,7 +6,8 @@ bin/
 dist/
 
 # Environment and config files with secrets
-.env
+.env*
+!.env.example
 config.json
 
 # IDE and editor
