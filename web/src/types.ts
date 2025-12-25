@@ -10,7 +10,9 @@ export type ConnectionStatus =
 export interface ServerEntry {
   id: string;
   guild_id: string;
+  guild_name?: string;
   channel_id: string;
+  channel_name?: string;
   connect_on_start: boolean;
   priority: number;
 }

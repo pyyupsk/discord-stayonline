@@ -59,6 +59,11 @@ func (r *Router) Setup() http.Handler {
 		r.mux.HandleFunc("POST /api/servers/", serversHandler.ExecuteAction)
 	}
 
+	// Discord info lookup handlers
+	discordHandler := NewDiscordHandler(r.logger)
+	r.mux.HandleFunc("GET /api/discord/server-info", discordHandler.GetServerInfo)
+	r.mux.HandleFunc("POST /api/discord/bulk-info", discordHandler.GetBulkServerInfo)
+
 	// WebSocket handler
 	if r.hub != nil {
 		allowedOrigins := os.Getenv("ALLOWED_ORIGINS")

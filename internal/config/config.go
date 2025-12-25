@@ -18,8 +18,14 @@ type ServerEntry struct {
 	// GuildID is the Discord server ID (snowflake, 17-19 digit string)
 	GuildID string `json:"guild_id"`
 
+	// GuildName is an optional friendly name for the server
+	GuildName string `json:"guild_name,omitempty"`
+
 	// ChannelID is the Discord voice channel ID (snowflake)
 	ChannelID string `json:"channel_id"`
+
+	// ChannelName is an optional friendly name for the channel
+	ChannelName string `json:"channel_name,omitempty"`
 
 	// ConnectOnStart determines if this connection should auto-connect when service starts
 	ConnectOnStart bool `json:"connect_on_start"`

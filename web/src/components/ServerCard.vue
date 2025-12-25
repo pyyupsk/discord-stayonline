@@ -48,6 +48,14 @@ const statusLabel = computed(() => {
       return "Disconnected";
   }
 });
+
+const displayName = computed(() => {
+  return props.server.guild_name || `Server ${props.server.guild_id.slice(-4)}`;
+});
+
+const channelDisplay = computed(() => {
+  return props.server.channel_name || props.server.channel_id;
+});
 </script>
 
 <template>
@@ -55,13 +63,13 @@ const statusLabel = computed(() => {
     <CardContent class="flex items-center justify-between gap-4 p-4">
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
-          <span class="font-medium">Server Entry</span>
+          <span class="font-medium">{{ displayName }}</span>
           <Badge :variant="statusVariant" class="text-xs">
             {{ statusLabel }}
           </Badge>
         </div>
         <p class="mt-1 truncate text-sm text-muted-foreground">
-          Guild: {{ server.guild_id }} • Channel: {{ server.channel_id }}
+          {{ channelDisplay }}
         </p>
       </div>
 
