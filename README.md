@@ -4,8 +4,7 @@ A self-hosted service that maintains Discord account presence by managing persis
 
 ## Terms of Service Warning
 
-> **IMPORTANT: READ BEFORE USE**
->
+> [!CAUTION]
 > This tool uses Discord user tokens to maintain presence status. Using user tokens with automated tools **may violate Discord's Terms of Service** and could result in **account suspension or termination**.
 >
 > By using this software, you acknowledge:
