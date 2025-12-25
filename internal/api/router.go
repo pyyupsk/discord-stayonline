@@ -50,6 +50,7 @@ func (r *Router) Setup() http.Handler {
 	// Health endpoint (public)
 	healthHandler := NewHealthHandler()
 	r.mux.HandleFunc("GET /health", healthHandler.Health)
+	r.mux.HandleFunc("HEAD /health", healthHandler.Health)
 
 	// Auth endpoints (public)
 	authHandler := NewAuthHandler(r.auth, r.logger)

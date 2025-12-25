@@ -12,15 +12,12 @@ func NewHealthHandler() *HealthHandler {
 	return &HealthHandler{}
 }
 
-// Health handles GET /health requests.
+// Health handles GET/HEAD /health requests.
 // Returns 200 OK with body "OK" if service is running.
 func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	w.Header().Set("Content-Type", "text/plain")
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("OK"))
+	if r.Method != http.MethodHead {
+		w.Write([]byte("OK"))
+	}
 }
