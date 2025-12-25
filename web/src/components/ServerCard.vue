@@ -1,32 +1,34 @@
 <script setup lang="ts">
+import { Pencil, Play, RotateCcw, Square, Trash2 } from "lucide-vue-next";
 import { computed } from "vue";
-import { Card, CardContent } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
+
+import type { ConnectionStatus, ServerEntry } from "@/types";
+
 import { Badge } from "@/components/ui/badge";
-import { Play, RotateCcw, Square, Pencil, Trash2 } from "lucide-vue-next";
-import type { ServerEntry, ConnectionStatus } from "@/types";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 
 const props = defineProps<{
+  loading?: boolean;
   server: ServerEntry;
   status: ConnectionStatus;
-  loading?: boolean;
 }>();
 
 const emit = defineEmits<{
+  delete: [];
+  edit: [];
+  exit: [];
   join: [];
   rejoin: [];
-  exit: [];
-  edit: [];
-  delete: [];
 }>();
 
 const statusVariant = computed(() => {
   switch (props.status) {
+    case "backoff":
+    case "connecting":
+      return "secondary";
     case "connected":
       return "default";
-    case "connecting":
-    case "backoff":
-      return "secondary";
     case "error":
       return "destructive";
     default:
@@ -36,12 +38,12 @@ const statusVariant = computed(() => {
 
 const statusLabel = computed(() => {
   switch (props.status) {
+    case "backoff":
+      return "Reconnecting...";
     case "connected":
       return "Connected";
     case "connecting":
       return "Connecting...";
-    case "backoff":
-      return "Reconnecting...";
     case "error":
       return "Error";
     default:
@@ -68,7 +70,7 @@ const channelDisplay = computed(() => {
             {{ statusLabel }}
           </Badge>
         </div>
-        <p class="mt-1 truncate text-sm text-muted-foreground">
+        <p class="text-muted-foreground mt-1 truncate text-sm">
           {{ channelDisplay }}
         </p>
       </div>
@@ -77,11 +79,9 @@ const channelDisplay = computed(() => {
         <Button
           variant="outline"
           size="icon"
-          :disabled="
-            loading || status === 'connected' || status === 'connecting'
-          "
-          @click="emit('join')"
+          :disabled="loading || status === 'connected' || status === 'connecting'"
           title="Join"
+          @click="emit('join')"
         >
           <Play />
         </Button>
@@ -89,8 +89,8 @@ const channelDisplay = computed(() => {
           variant="outline"
           size="icon"
           :disabled="loading"
-          @click="emit('rejoin')"
           title="Rejoin"
+          @click="emit('rejoin')"
         >
           <RotateCcw />
         </Button>
@@ -98,20 +98,20 @@ const channelDisplay = computed(() => {
           variant="outline"
           size="icon"
           :disabled="loading || status === 'disconnected'"
-          @click="emit('exit')"
           title="Exit"
+          @click="emit('exit')"
         >
           <Square />
         </Button>
-        <Button variant="ghost" size="icon" @click="emit('edit')" title="Edit">
+        <Button variant="ghost" size="icon" title="Edit" @click="emit('edit')">
           <Pencil />
         </Button>
         <Button
           variant="ghost"
           size="icon"
           class="text-destructive hover:text-destructive"
-          @click="emit('delete')"
           title="Delete"
+          @click="emit('delete')"
         >
           <Trash2 />
         </Button>

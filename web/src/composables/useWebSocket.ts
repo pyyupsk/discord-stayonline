@@ -1,35 +1,18 @@
-import { ref, computed, onUnmounted } from "vue";
-import type {
-  ConnectionStatus,
-  LogEntry,
-  WebSocketMessage,
-  Configuration,
-} from "@/types";
+import { computed, onUnmounted, ref } from "vue";
+
+import type { Configuration, ConnectionStatus, LogEntry, WebSocketMessage } from "@/types";
 
 const MAX_RECONNECT_ATTEMPTS = 10;
 const MAX_LOG_ENTRIES = 500;
 
-const wsStatus = ref<"connected" | "connecting" | "disconnected" | "error">(
-  "disconnected",
-);
+const wsStatus = ref<"connected" | "connecting" | "disconnected" | "error">("disconnected");
 const serverStatuses = ref<Map<string, ConnectionStatus>>(new Map());
 const logs = ref<LogEntry[]>([]);
-const logFilter = ref<LogEntry["level"] | "all">("all");
+const logFilter = ref<"all" | LogEntry["level"]>("all");
 
-let ws: WebSocket | null = null;
+let ws: null | WebSocket = null;
 let reconnectAttempt = 0;
-let reconnectTimeout: ReturnType<typeof setTimeout> | null = null;
-
-function disconnect() {
-  if (reconnectTimeout) {
-    clearTimeout(reconnectTimeout);
-    reconnectTimeout = null;
-  }
-  if (ws) {
-    ws.close();
-    ws = null;
-  }
-}
+let reconnectTimeout: null | ReturnType<typeof setTimeout> = null;
 
 export function useWebSocket() {
   let onConfigChanged: ((config: Configuration) => void) | null = null;
@@ -72,9 +55,9 @@ export function useWebSocket() {
         // Avoid duplicates
         if (!existingMessages.has(log.message)) {
           logs.value.push({
-            time: new Date(log.timestamp),
             level: log.level,
             message: log.message,
+            time: new Date(log.timestamp),
           });
         }
       }
@@ -105,7 +88,7 @@ export function useWebSocket() {
         wsStatus.value = "connected";
         addLog("info", "WebSocket connected");
 
-        ws?.send(JSON.stringify({ type: "subscribe", channel: "logs" }));
+        ws?.send(JSON.stringify({ channel: "logs", type: "subscribe" }));
 
         // Load current statuses and logs after connecting
         loadStatuses();
@@ -139,21 +122,6 @@ export function useWebSocket() {
 
   function handleMessage(msg: WebSocketMessage) {
     switch (msg.type) {
-      case "status":
-        if (msg.server_id && msg.status) {
-          serverStatuses.value.set(msg.server_id, msg.status);
-          if (msg.message) {
-            addLog("info", `[${msg.server_id}] ${msg.message}`);
-          }
-        }
-        break;
-
-      case "log":
-        if (msg.message) {
-          addLog((msg.level as LogEntry["level"]) || "info", msg.message);
-        }
-        break;
-
       case "config_changed":
         if (msg.config && onConfigChanged) {
           onConfigChanged(msg.config);
@@ -165,6 +133,21 @@ export function useWebSocket() {
         addLog("error", `[${msg.code}] ${msg.message}`);
         if (msg.server_id) {
           serverStatuses.value.set(msg.server_id, "error");
+        }
+        break;
+
+      case "log":
+        if (msg.message) {
+          addLog((msg.level as LogEntry["level"]) || "info", msg.message);
+        }
+        break;
+
+      case "status":
+        if (msg.server_id && msg.status) {
+          serverStatuses.value.set(msg.server_id, msg.status);
+          if (msg.message) {
+            addLog("info", `[${msg.server_id}] ${msg.message}`);
+          }
         }
         break;
     }
@@ -185,9 +168,9 @@ export function useWebSocket() {
 
   function addLog(level: LogEntry["level"], message: string) {
     logs.value.push({
-      time: new Date(),
       level,
       message,
+      time: new Date(),
     });
 
     // Keep only the last N entries
@@ -212,24 +195,35 @@ export function useWebSocket() {
     disconnect();
   });
 
-  function setLogFilter(filter: LogEntry["level"] | "all") {
+  function setLogFilter(filter: "all" | LogEntry["level"]) {
     logFilter.value = filter;
   }
 
   return {
-    wsStatus,
-    serverStatuses,
-    logs,
-    filteredLogs,
-    logFilter,
-    connect,
-    disconnect,
-    loadStatuses,
-    loadLogs,
     addLog,
     clearLogs,
+    connect,
+    disconnect,
+    filteredLogs,
     getServerStatus,
-    setOnConfigChanged,
+    loadLogs,
+    loadStatuses,
+    logFilter,
+    logs,
+    serverStatuses,
     setLogFilter,
+    setOnConfigChanged,
+    wsStatus,
   };
+}
+
+function disconnect() {
+  if (reconnectTimeout) {
+    clearTimeout(reconnectTimeout);
+    reconnectTimeout = null;
+  }
+  if (ws) {
+    ws.close();
+    ws = null;
+  }
 }

@@ -1,4 +1,5 @@
 import { ref } from "vue";
+
 import type { ConnectionStatus } from "@/types";
 
 const actionLoading = ref<Map<string, boolean>>(new Map());
@@ -6,38 +7,38 @@ const actionLoading = ref<Map<string, boolean>>(new Map());
 export function useServers() {
   async function executeAction(
     serverId: string,
-    action: "join" | "rejoin" | "exit",
+    action: "exit" | "join" | "rejoin",
   ): Promise<{
-    success: boolean;
-    newStatus?: ConnectionStatus;
     error?: string;
+    newStatus?: ConnectionStatus;
+    success: boolean;
   }> {
     actionLoading.value.set(serverId, true);
 
     try {
       const response = await fetch(`/api/servers/${serverId}/action`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ action }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         return {
-          success: false,
           error: data.message || `Action '${action}' failed`,
+          success: false,
         };
       }
 
       return {
-        success: true,
         newStatus: data.new_status,
+        success: true,
       };
     } catch (err) {
       return {
-        success: false,
         error: err instanceof Error ? err.message : "Unknown error",
+        success: false,
       };
     } finally {
       actionLoading.value.set(serverId, false);
@@ -62,9 +63,9 @@ export function useServers() {
 
   return {
     actionLoading,
-    joinServer,
-    rejoinServer,
     exitServer,
     isLoading,
+    joinServer,
+    rejoinServer,
   };
 }

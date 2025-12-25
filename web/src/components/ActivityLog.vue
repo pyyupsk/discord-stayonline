@@ -1,14 +1,16 @@
 <script setup lang="ts">
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Button } from "@/components/ui/button";
 import { Trash2 } from "lucide-vue-next";
+
 import type { LogEntry } from "@/types";
 
-type LogFilter = LogEntry["level"] | "all";
+import { Button } from "@/components/ui/button";
+import { ScrollArea } from "@/components/ui/scroll-area";
+
+type LogFilter = "all" | LogEntry["level"];
 
 const props = defineProps<{
-  logs: LogEntry[];
   filter: LogFilter;
+  logs: LogEntry[];
 }>();
 
 const emit = defineEmits<{
@@ -16,11 +18,11 @@ const emit = defineEmits<{
   "update:filter": [value: LogFilter];
 }>();
 
-const filterOptions: { value: LogFilter; label: string }[] = [
-  { value: "all", label: "All" },
-  { value: "info", label: "Info" },
-  { value: "warn", label: "Warn" },
-  { value: "error", label: "Error" },
+const filterOptions: { label: string; value: LogFilter }[] = [
+  { label: "All", value: "all" },
+  { label: "Info", value: "info" },
+  { label: "Warn", value: "warn" },
+  { label: "Error", value: "error" },
 ];
 
 function formatTime(date: Date): string {
@@ -29,12 +31,12 @@ function formatTime(date: Date): string {
 
 function getLevelClass(level: LogEntry["level"]): string {
   switch (level) {
+    case "debug":
+      return "text-muted-foreground";
     case "error":
       return "text-destructive";
     case "warn":
       return "text-yellow-500";
-    case "debug":
-      return "text-muted-foreground";
     default:
       return "text-blue-500";
   }
@@ -58,30 +60,20 @@ function getLevelClass(level: LogEntry["level"]): string {
             {{ option.label }}
           </Button>
         </div>
-        <Button
-          variant="ghost"
-          size="sm"
-          class="h-7 px-2 text-xs"
-          @click="emit('clear')"
-        >
+        <Button variant="ghost" size="sm" class="h-7 px-2 text-xs" @click="emit('clear')">
           <Trash2 />
         </Button>
       </div>
     </div>
 
-    <ScrollArea class="h-48 rounded-md border bg-muted/30 p-3">
-      <div
-        v-if="logs.length === 0"
-        class="text-center text-sm text-muted-foreground"
-      >
+    <ScrollArea class="bg-muted/30 h-48 rounded-md border p-3">
+      <div v-if="logs.length === 0" class="text-muted-foreground text-center text-sm">
         No activity yet
       </div>
       <div v-else class="space-y-1 font-mono text-xs">
         <div v-for="(log, index) in logs" :key="index" class="flex gap-2">
           <span class="text-muted-foreground">{{ formatTime(log.time) }}</span>
-          <span :class="getLevelClass(log.level)" class="uppercase">
-            [{{ log.level }}]
-          </span>
+          <span :class="getLevelClass(log.level)" class="uppercase"> [{{ log.level }}] </span>
           <span class="text-foreground">{{ log.message }}</span>
         </div>
       </div>

@@ -1,4 +1,4 @@
-.PHONY: dev start build test lint fmt clean docker help
+.PHONY: dev start build test lint lint-fix format clean docker help
 
 # Binary output
 BINARY_NAME=discord-stayonline
@@ -33,14 +33,19 @@ build:
 test:
 	go test -v ./...
 
-# Run linter
+# Run linter (Go + Web)
 lint:
 	golangci-lint run
+	cd web && bun run lint
 
-# Format code
+# Format code (Go + Web)
 format:
 	go fmt ./...
-	@cd web && bun run lint 2>/dev/null || true
+	cd web && bun run format
+
+# Fix lint errors
+lint-fix:
+	cd web && bun run lint:fix
 
 # Clean build artifacts
 clean:
@@ -96,7 +101,7 @@ ci: lint test check-size
 	@echo "All checks passed!"
 
 # Check code quality
-check: fmt lint test
+check: format lint test
 
 # Run tests with coverage
 coverage:
@@ -156,9 +161,10 @@ help:
 	@echo ""
 	@echo "Testing:"
 	@echo "  test         Run tests"
-	@echo "  lint         Run linter"
-	@echo "  fmt          Format code"
-	@echo "  check        Run fmt + lint + test"
+	@echo "  lint         Run linter (Go + Web)"
+	@echo "  lint-fix     Fix lint errors (Web)"
+	@echo "  format       Format code (Go + Web)"
+	@echo "  check        Run format + lint + test"
 	@echo "  coverage     Generate coverage report"
 	@echo ""
 	@echo "Docker:"

@@ -1,52 +1,47 @@
-export type Status = "online" | "idle" | "dnd";
-
-export type ConnectionStatus =
-  | "connected"
-  | "connecting"
-  | "disconnected"
-  | "error"
-  | "backoff";
-
-export interface ServerEntry {
-  id: string;
-  guild_id: string;
-  guild_name?: string;
-  channel_id: string;
-  channel_name?: string;
-  connect_on_start: boolean;
-  priority: number;
-}
-
-export interface Configuration {
+export type Configuration = {
   servers: ServerEntry[];
   status: Status;
   tos_acknowledged: boolean;
-}
+};
 
-export interface LogEntry {
-  time: Date;
-  level: "info" | "warn" | "error" | "debug";
-  message: string;
-}
+export type ConnectionStatus = "backoff" | "connected" | "connecting" | "disconnected" | "error";
 
-export interface WebSocketMessage {
-  type: "status" | "log" | "config_changed" | "error";
-  server_id?: string;
-  status?: ConnectionStatus;
-  message?: string;
-  level?: string;
-  config?: Configuration;
-  code?: string;
-}
-
-export interface GuildInfo {
+export type GuildInfo = {
+  icon?: string;
   id: string;
   name: string;
-  icon?: string;
-}
+};
 
-export interface VoiceChannelInfo {
+export type LogEntry = {
+  level: "debug" | "error" | "info" | "warn";
+  message: string;
+  time: Date;
+};
+
+export type ServerEntry = {
+  channel_id: string;
+  channel_name?: string;
+  connect_on_start: boolean;
+  guild_id: string;
+  guild_name?: string;
+  id: string;
+  priority: number;
+};
+
+export type Status = "dnd" | "idle" | "online";
+
+export type VoiceChannelInfo = {
   id: string;
   name: string;
   position: number;
-}
+};
+
+export type WebSocketMessage = {
+  code?: string;
+  config?: Configuration;
+  level?: string;
+  message?: string;
+  server_id?: string;
+  status?: ConnectionStatus;
+  type: "config_changed" | "error" | "log" | "status";
+};

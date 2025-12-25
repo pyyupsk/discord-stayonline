@@ -3,7 +3,7 @@ import { ref } from "vue";
 const authenticated = ref(false);
 const authRequired = ref(false);
 const loading = ref(false);
-const error = ref<string | null>(null);
+const error = ref<null | string>(null);
 
 export function useAuth() {
   async function checkAuth() {
@@ -33,9 +33,9 @@ export function useAuth() {
 
     try {
       const response = await fetch("/api/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ api_key: apiKey }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
 
       const data = await response.json();
@@ -80,9 +80,9 @@ export function useAuth() {
   return {
     authenticated,
     authRequired,
-    loading,
-    error,
     checkAuth,
+    error,
+    loading,
     login,
     logout,
   };

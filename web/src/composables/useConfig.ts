@@ -1,4 +1,5 @@
 import { ref } from "vue";
+
 import type { Configuration, ServerEntry, Status } from "@/types";
 
 const config = ref<Configuration>({
@@ -8,53 +9,7 @@ const config = ref<Configuration>({
 });
 
 const loading = ref(false);
-const error = ref<string | null>(null);
-
-function generateId(): string {
-  return Array.from({ length: 8 }, () =>
-    Math.floor(Math.random() * 16).toString(16),
-  ).join("");
-}
-
-async function fetchServerNames(servers: ServerEntry[]): Promise<void> {
-  if (servers.length === 0) return;
-
-  try {
-    const response = await fetch("/api/discord/bulk-info", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(
-        servers.map((s) => ({
-          guild_id: s.guild_id,
-          channel_id: s.channel_id,
-        })),
-      ),
-    });
-
-    if (!response.ok) return;
-
-    const results: Array<{
-      guild_id: string;
-      guild_name: string;
-      channel_id: string;
-      channel_name: string;
-    }> = await response.json();
-
-    // Merge names into servers
-    for (const result of results) {
-      const server = servers.find(
-        (s) =>
-          s.guild_id === result.guild_id && s.channel_id === result.channel_id,
-      );
-      if (server) {
-        server.guild_name = result.guild_name || undefined;
-        server.channel_name = result.channel_name || undefined;
-      }
-    }
-  } catch {
-    // Silently fail - names are optional
-  }
-}
+const error = ref<null | string>(null);
 
 export function useConfig() {
   async function loadConfig() {
@@ -83,12 +38,12 @@ export function useConfig() {
 
     try {
       const response = await fetch("/api/config", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           servers,
           status: status ?? config.value.status,
         }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
 
       if (!response.ok) {
@@ -125,9 +80,9 @@ export function useConfig() {
 
     try {
       const response = await fetch("/api/acknowledge-tos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ acknowledged: true }),
+        headers: { "Content-Type": "application/json" },
+        method: "POST",
       });
 
       if (!response.ok) {
@@ -156,9 +111,7 @@ export function useConfig() {
   }
 
   async function updateServer(id: string, updates: Partial<ServerEntry>) {
-    const servers = config.value.servers.map((s) =>
-      s.id === id ? { ...s, ...updates } : s,
-    );
+    const servers = config.value.servers.map((s) => (s.id === id ? { ...s, ...updates } : s));
     return saveConfig(servers);
   }
 
@@ -172,16 +125,59 @@ export function useConfig() {
   }
 
   return {
-    config,
-    loading,
-    error,
-    loadConfig,
-    saveConfig,
-    updateStatus,
     acknowledgeTos,
     addServer,
-    updateServer,
+    config,
     deleteServer,
+    error,
+    loadConfig,
+    loading,
+    saveConfig,
     setConfig,
+    updateServer,
+    updateStatus,
   };
+}
+
+async function fetchServerNames(servers: ServerEntry[]): Promise<void> {
+  if (servers.length === 0) return;
+
+  try {
+    const response = await fetch("/api/discord/bulk-info", {
+      body: JSON.stringify(
+        servers.map((s) => ({
+          channel_id: s.channel_id,
+          guild_id: s.guild_id,
+        })),
+      ),
+      headers: { "Content-Type": "application/json" },
+      method: "POST",
+    });
+
+    if (!response.ok) return;
+
+    const results: Array<{
+      channel_id: string;
+      channel_name: string;
+      guild_id: string;
+      guild_name: string;
+    }> = await response.json();
+
+    // Merge names into servers
+    for (const result of results) {
+      const server = servers.find(
+        (s) => s.guild_id === result.guild_id && s.channel_id === result.channel_id,
+      );
+      if (server) {
+        server.guild_name = result.guild_name || undefined;
+        server.channel_name = result.channel_name || undefined;
+      }
+    }
+  } catch {
+    // Silently fail - names are optional
+  }
+}
+
+function generateId(): string {
+  return Array.from({ length: 8 }, () => Math.floor(Math.random() * 16).toString(16)).join("");
 }

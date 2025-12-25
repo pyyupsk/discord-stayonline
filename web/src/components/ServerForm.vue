@@ -1,5 +1,10 @@
 <script setup lang="ts">
-import { ref, watch, computed } from "vue";
+import { Loader2 } from "lucide-vue-next";
+import { computed, ref, watch } from "vue";
+
+import type { GuildInfo, ServerEntry, VoiceChannelInfo } from "@/types";
+
+import { Button } from "@/components/ui/button";
 import {
   Dialog,
   DialogContent,
@@ -8,9 +13,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Switch } from "@/components/ui/switch";
 import {
   Select,
   SelectContent,
@@ -18,17 +21,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Loader2 } from "lucide-vue-next";
-import type { ServerEntry, GuildInfo, VoiceChannelInfo } from "@/types";
+import { Switch } from "@/components/ui/switch";
 
 const props = defineProps<{
   open: boolean;
-  server?: ServerEntry | null;
+  server?: null | ServerEntry;
 }>();
 
 const emit = defineEmits<{
-  "update:open": [value: boolean];
   save: [server: Omit<ServerEntry, "id"> & { id?: string }];
+  "update:open": [value: boolean];
 }>();
 
 const guildId = ref("");
@@ -41,28 +43,8 @@ const loadingGuilds = ref(false);
 const loadingChannels = ref(false);
 const errorMessage = ref("");
 
-const selectedGuild = computed(() =>
-  guilds.value.find((g) => g.id === guildId.value),
-);
-const selectedChannel = computed(() =>
-  channels.value.find((c) => c.id === channelId.value),
-);
-
-async function fetchGuilds() {
-  loadingGuilds.value = true;
-  errorMessage.value = "";
-  try {
-    const response = await fetch("/api/discord/guilds");
-    if (!response.ok) {
-      throw new Error("Failed to fetch guilds");
-    }
-    guilds.value = await response.json();
-  } catch {
-    errorMessage.value = "Failed to load servers. Please try again.";
-  } finally {
-    loadingGuilds.value = false;
-  }
-}
+const selectedGuild = computed(() => guilds.value.find((g) => g.id === guildId.value));
+const selectedChannel = computed(() => channels.value.find((c) => c.id === channelId.value));
 
 async function fetchChannels(guildId: string) {
   if (!guildId) {
@@ -82,6 +64,22 @@ async function fetchChannels(guildId: string) {
     channels.value = [];
   } finally {
     loadingChannels.value = false;
+  }
+}
+
+async function fetchGuilds() {
+  loadingGuilds.value = true;
+  errorMessage.value = "";
+  try {
+    const response = await fetch("/api/discord/guilds");
+    if (!response.ok) {
+      throw new Error("Failed to fetch guilds");
+    }
+    guilds.value = await response.json();
+  } catch {
+    errorMessage.value = "Failed to load servers. Please try again.";
+  } finally {
+    loadingGuilds.value = false;
   }
 }
 
@@ -115,22 +113,22 @@ watch(guildId, async (newGuildId, oldGuildId) => {
 
 const isEdit = () => !!props.server;
 
+function handleClose() {
+  emit("update:open", false);
+}
+
 function handleSubmit() {
   if (!guildId.value || !channelId.value) return;
 
   emit("save", {
-    id: props.server?.id,
-    guild_id: guildId.value,
-    guild_name: selectedGuild.value?.name,
     channel_id: channelId.value,
     channel_name: selectedChannel.value?.name,
     connect_on_start: connectOnStart.value,
+    guild_id: guildId.value,
+    guild_name: selectedGuild.value?.name,
+    id: props.server?.id,
     priority: props.server?.priority ?? 1,
   });
-}
-
-function handleClose() {
-  emit("update:open", false);
 }
 </script>
 
@@ -140,22 +138,15 @@ function handleClose() {
       <DialogHeader>
         <DialogTitle>{{ isEdit() ? "Edit Server" : "Add Server" }}</DialogTitle>
         <DialogDescription>
-          {{
-            isEdit()
-              ? "Update the server connection settings."
-              : "Add a new server connection."
-          }}
+          {{ isEdit() ? "Update the server connection settings." : "Add a new server connection." }}
         </DialogDescription>
       </DialogHeader>
 
-      <div
-        v-if="errorMessage"
-        class="rounded-md bg-destructive/10 p-3 text-sm text-destructive"
-      >
+      <div v-if="errorMessage" class="bg-destructive/10 text-destructive rounded-md p-3 text-sm">
         {{ errorMessage }}
       </div>
 
-      <form @submit.prevent="handleSubmit" class="space-y-4">
+      <form class="space-y-4" @submit.prevent="handleSubmit">
         <div class="space-y-2">
           <Label for="guild-select">Server</Label>
           <Select v-model="guildId" :disabled="loadingGuilds">
@@ -164,11 +155,7 @@ function handleClose() {
               <SelectValue v-else placeholder="Select a server" />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem
-                v-for="guild in guilds"
-                :key="guild.id"
-                :value="guild.id"
-              >
+              <SelectItem v-for="guild in guilds" :key="guild.id" :value="guild.id">
                 {{ guild.name }}
               </SelectItem>
             </SelectContent>
@@ -182,24 +169,18 @@ function handleClose() {
               <Loader2 v-if="loadingChannels" class="animate-spin" />
               <SelectValue
                 v-else
-                :placeholder="
-                  guildId ? 'Select a voice channel' : 'Select a server first'
-                "
+                :placeholder="guildId ? 'Select a voice channel' : 'Select a server first'"
               />
             </SelectTrigger>
             <SelectContent>
-              <SelectItem
-                v-for="channel in channels"
-                :key="channel.id"
-                :value="channel.id"
-              >
+              <SelectItem v-for="channel in channels" :key="channel.id" :value="channel.id">
                 {{ channel.name }}
               </SelectItem>
             </SelectContent>
           </Select>
           <p
             v-if="guildId && channels.length === 0 && !loadingChannels"
-            class="text-xs text-muted-foreground"
+            class="text-muted-foreground text-xs"
           >
             No voice channels available in this server
           </p>
@@ -213,9 +194,7 @@ function handleClose() {
         </div>
 
         <DialogFooter>
-          <Button type="button" variant="outline" @click="handleClose">
-            Cancel
-          </Button>
+          <Button type="button" variant="outline" @click="handleClose"> Cancel </Button>
           <Button type="submit" :disabled="!guildId || !channelId">
             {{ isEdit() ? "Save Changes" : "Add Server" }}
           </Button>
