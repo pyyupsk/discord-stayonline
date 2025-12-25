@@ -12,12 +12,12 @@ import (
 )
 
 const (
-	testConfigFile  = "config.json"
-	testServerID1   = "test-1"
-	testGuildID1    = "123456789012345678"
-	testChannelID1  = "234567890123456789"
-	errLoadFormat   = "Load() error = %v"
-	errSaveFormat   = "Save() error = %v"
+	testConfigFile = "config.json"
+	testServerID1  = "test-1"
+	testGuildID1   = "123456789012345678"
+	testChannelID1 = "234567890123456789"
+	errLoadFormat  = "Load() error = %v"
+	errSaveFormat  = "Save() error = %v"
 )
 
 func TestConfigStoreLoadNonExistent(t *testing.T) {
@@ -368,4 +368,3 @@ func TestConfigurationJSONFormat(t *testing.T) {
 		}
 	}
 }
-

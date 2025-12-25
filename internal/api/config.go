@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	errMethodNotAllowed    = "Method not allowed"
-	errFailedToLoadConfig  = "Failed to load config"
-	msgFailedToLoadConfig  = "Failed to load configuration"
+	errMethodNotAllowed   = "Method not allowed"
+	errFailedToLoadConfig = "Failed to load config"
+	msgFailedToLoadConfig = "Failed to load configuration"
 )
 
 // ConfigHandler handles configuration API requests.

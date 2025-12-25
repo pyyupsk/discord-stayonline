@@ -36,6 +36,10 @@ const statusVariant = computed(() => {
   }
 });
 
+const isConnecting = computed(() => {
+  return props.status === "connecting" || props.status === "backoff";
+});
+
 const statusLabel = computed(() => {
   switch (props.status) {
     case "backoff":
@@ -61,24 +65,38 @@ const channelDisplay = computed(() => {
 </script>
 
 <template>
-  <Card>
+  <Card class="hover-lift border-border/50 hover:border-border transition-colors">
     <CardContent class="flex items-center justify-between gap-4">
       <div class="min-w-0 flex-1">
         <div class="flex items-center gap-2">
+          <div
+            class="h-2 w-2 rounded-full"
+            :class="{
+              'bg-success status-glow': status === 'connected',
+              'bg-muted-foreground pulse-connecting': isConnecting,
+              'bg-destructive': status === 'error',
+              'bg-muted-foreground/50': status === 'disconnected',
+            }"
+          />
           <span class="font-medium">{{ displayName }}</span>
-          <Badge :variant="statusVariant" class="text-xs">
+          <Badge
+            :variant="statusVariant"
+            class="text-xs"
+            :class="{ 'pulse-connecting': isConnecting }"
+          >
             {{ statusLabel }}
           </Badge>
         </div>
-        <p class="text-muted-foreground mt-1 truncate text-sm">
+        <p class="text-muted-foreground mt-1 truncate pl-4 text-sm">
           {{ channelDisplay }}
         </p>
       </div>
 
-      <div class="flex items-center gap-2">
+      <div class="flex items-center gap-1">
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
+          class="press-effect"
           :disabled="loading || status === 'connected' || status === 'connecting'"
           title="Join"
           @click="emit('join')"
@@ -86,8 +104,9 @@ const channelDisplay = computed(() => {
           <Play />
         </Button>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
+          class="press-effect"
           :disabled="loading"
           title="Rejoin"
           @click="emit('rejoin')"
@@ -95,21 +114,23 @@ const channelDisplay = computed(() => {
           <RotateCcw />
         </Button>
         <Button
-          variant="outline"
+          variant="ghost"
           size="icon"
+          class="press-effect"
           :disabled="loading || status === 'disconnected'"
           title="Exit"
           @click="emit('exit')"
         >
           <Square />
         </Button>
-        <Button variant="ghost" size="icon" title="Edit" @click="emit('edit')">
+        <div class="bg-border mx-1 h-4 w-px" />
+        <Button variant="ghost" size="icon" class="press-effect" title="Edit" @click="emit('edit')">
           <Pencil />
         </Button>
         <Button
           variant="ghost"
           size="icon"
-          class="text-destructive hover:text-destructive"
+          class="press-effect text-destructive hover:bg-destructive/10 hover:text-destructive"
           title="Delete"
           @click="emit('delete')"
         >

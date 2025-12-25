@@ -167,7 +167,10 @@ async function handleStatusChange(status: Status) {
 <template>
   <!-- Loading State -->
   <div v-if="initialLoading" class="flex min-h-screen items-center justify-center">
-    <p class="text-muted-foreground">Loading...</p>
+    <div class="flex flex-col items-center gap-3">
+      <div class="border-muted border-t-foreground h-8 w-8 animate-spin rounded-full border-2" />
+      <p class="text-muted-foreground text-sm">Loading...</p>
+    </div>
   </div>
 
   <!-- Login Form -->
@@ -181,18 +184,30 @@ async function handleStatusChange(status: Status) {
     <!-- Main App -->
     <div v-if="config.tos_acknowledged" class="bg-background min-h-screen">
       <!-- Header -->
-      <header class="border-b">
-        <div class="container mx-auto flex items-center justify-between px-4 py-4">
-          <h1 class="text-xl font-semibold">Discord Stay Online</h1>
+      <header class="gradient-border bg-background/80 sticky top-0 z-50 backdrop-blur-sm">
+        <div class="container mx-auto flex items-center justify-between px-6 py-4">
           <div class="flex items-center gap-3">
-            <Badge :variant="isConnected ? 'default' : 'secondary'">
-              <component :is="isConnected ? Wifi : WifiOff" />
+            <div class="bg-foreground flex h-8 w-8 items-center justify-center rounded-lg">
+              <span class="text-background text-sm font-bold">DS</span>
+            </div>
+            <h1 class="text-lg font-semibold tracking-tight">Discord Stay Online</h1>
+          </div>
+          <div class="flex items-center gap-3">
+            <Badge
+              :variant="isConnected ? 'default' : 'secondary'"
+              :class="[isConnected ? 'status-glow' : '', 'transition-all duration-300']"
+            >
+              <component
+                :is="isConnected ? Wifi : WifiOff"
+                :class="[!isConnected && 'opacity-50']"
+              />
               {{ isConnected ? "Connected" : "Disconnected" }}
             </Badge>
             <Button
               v-if="authRequired"
               variant="ghost"
               size="icon"
+              class="press-effect"
               :disabled="authLoading"
               title="Logout"
               @click="handleLogout"
@@ -204,19 +219,29 @@ async function handleStatusChange(status: Status) {
       </header>
 
       <!-- Main Content -->
-      <main class="container mx-auto space-y-6 px-4 py-6">
+      <main class="container mx-auto space-y-8 px-6 py-8">
         <!-- Global Status -->
-        <section class="flex items-center justify-between">
+        <section class="fade-in flex items-center justify-between">
           <GlobalStatus :status="config.status" @change="handleStatusChange" />
         </section>
 
-        <Separator />
+        <Separator class="opacity-50" />
 
         <!-- Server List -->
-        <section class="space-y-4">
+        <section class="fade-in space-y-4">
           <div class="flex items-center justify-between">
-            <h2 class="text-lg font-medium">Server Connections</h2>
-            <Button size="sm" :disabled="config.servers.length >= 35" @click="handleAddServer">
+            <div>
+              <h2 class="text-base font-medium">Server Connections</h2>
+              <p class="text-muted-foreground text-sm">
+                {{ config.servers.length }} / 35 servers configured
+              </p>
+            </div>
+            <Button
+              size="sm"
+              class="press-effect"
+              :disabled="config.servers.length >= 35"
+              @click="handleAddServer"
+            >
               <Plus />
               Add Server
             </Button>
@@ -224,9 +249,14 @@ async function handleStatusChange(status: Status) {
 
           <div
             v-if="config.servers.length === 0"
-            class="rounded-lg border border-dashed p-8 text-center"
+            class="border-muted-foreground/25 rounded-lg border border-dashed p-12 text-center"
           >
-            <p class="text-muted-foreground">
+            <div
+              class="bg-muted mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
+            >
+              <Plus class="text-muted-foreground h-5 w-5" />
+            </div>
+            <p class="text-muted-foreground text-sm">
               No servers configured. Click "Add Server" to get started.
             </p>
           </div>
@@ -238,6 +268,7 @@ async function handleStatusChange(status: Status) {
               :server="server"
               :status="getServerStatus(server.id)"
               :loading="isLoading(server.id)"
+              class="fade-in"
               @join="handleJoin(server)"
               @rejoin="handleRejoin(server)"
               @exit="handleExit(server)"
@@ -247,10 +278,10 @@ async function handleStatusChange(status: Status) {
           </div>
         </section>
 
-        <Separator />
+        <Separator class="opacity-50" />
 
         <!-- Activity Log -->
-        <section>
+        <section class="fade-in">
           <ActivityLog
             :logs="filteredLogs"
             :filter="logFilter"

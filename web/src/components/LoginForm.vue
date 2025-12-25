@@ -20,26 +20,27 @@ async function handleSubmit() {
 
 <template>
   <div class="flex min-h-screen items-center justify-center p-4">
-    <Card class="w-full max-w-md">
-      <CardHeader class="text-center">
-        <div
-          class="bg-primary/10 mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full"
-        >
-          <KeyRound class="text-primary h-6 w-6" />
+    <Card class="fade-in border-border/50 bg-card/50 w-full max-w-sm backdrop-blur-sm">
+      <CardHeader class="space-y-4 text-center">
+        <div class="bg-foreground mx-auto flex h-12 w-12 items-center justify-center rounded-lg">
+          <KeyRound class="text-background h-5 w-5" />
         </div>
-        <CardTitle class="text-xl">Discord Stay Online</CardTitle>
-        <p class="text-muted-foreground text-sm">Enter your API key to access the dashboard</p>
+        <div class="space-y-1">
+          <CardTitle class="text-lg font-semibold tracking-tight">Discord Stay Online</CardTitle>
+          <p class="text-muted-foreground text-sm">Enter your API key to continue</p>
+        </div>
       </CardHeader>
       <CardContent>
         <form class="space-y-4" @submit.prevent="handleSubmit">
           <div class="space-y-2">
-            <Label for="api-key">API Key</Label>
+            <Label for="api-key" class="text-sm font-medium">API Key</Label>
             <Input
               id="api-key"
               v-model="apiKey"
               type="password"
-              placeholder="Enter your API key"
+              placeholder="sk-..."
               autocomplete="current-password"
+              class="bg-background/50 focus:bg-background transition-colors"
               required
             />
           </div>
@@ -48,9 +49,9 @@ async function handleSubmit() {
             {{ error }}
           </p>
 
-          <Button type="submit" class="w-full" :disabled="loading || !apiKey.trim()">
+          <Button type="submit" class="press-effect w-full" :disabled="loading || !apiKey.trim()">
             <LogIn />
-            {{ loading ? "Logging in..." : "Login" }}
+            {{ loading ? "Authenticating..." : "Continue" }}
           </Button>
         </form>
       </CardContent>
