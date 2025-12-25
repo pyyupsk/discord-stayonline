@@ -517,16 +517,20 @@ func TestCloseWithActiveConnection(t *testing.T) {
 	client.readStop = make(chan struct{})
 	client.readDone = make(chan struct{})
 
+	// Capture channels before starting goroutine to avoid race
+	readStop := client.readStop
+	readDone := client.readDone
+
 	// Start a goroutine to close readDone when readStop is closed
 	go func() {
-		<-client.readStop
-		close(client.readDone)
+		<-readStop
+		close(readDone)
 	}()
 
-	stateChanged := false
+	stateChanged := make(chan struct{})
 	client.OnStateChange = func(state int) {
 		if state == StateClosed {
-			stateChanged = true
+			close(stateChanged)
 		}
 	}
 
@@ -539,7 +543,10 @@ func TestCloseWithActiveConnection(t *testing.T) {
 		t.Errorf("expected state StateClosed, got %d", client.State())
 	}
 
-	if !stateChanged {
+	select {
+	case <-stateChanged:
+		// OnStateChange was called with StateClosed
+	case <-time.After(time.Second):
 		t.Error("expected OnStateChange to be called with StateClosed")
 	}
 }
