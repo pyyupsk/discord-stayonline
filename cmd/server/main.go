@@ -12,6 +12,7 @@ import (
 
 	"github.com/pyyupsk/discord-stayonline/internal/api"
 	"github.com/pyyupsk/discord-stayonline/internal/config"
+	"github.com/pyyupsk/discord-stayonline/internal/manager"
 )
 
 func main() {
@@ -48,13 +49,14 @@ func main() {
 	}
 	slog.Info("Configuration loaded", "servers", len(cfg.Servers), "tos_acknowledged", cfg.TOSAcknowledged)
 
-	// TODO: Initialize WebSocket Hub
-	// TODO: Initialize SessionManager with token and hub
-	// TODO: Start SessionManager background goroutines
-	// TODO: Start auto-connect for servers with connect_on_start=true (after TOS acknowledgment)
+	// Initialize SessionManager
+	sessionMgr := manager.NewSessionManager(token, store, logger)
+
+	// TODO: Initialize WebSocket Hub and wire to SessionManager.OnStatusChange
+	// TODO: Start SessionManager auto-connect (after router setup)
 
 	// Set up HTTP router
-	router := api.NewRouter(store, logger)
+	router := api.NewRouter(store, sessionMgr, logger)
 	handler := router.Setup()
 
 	// Create server with timeouts
@@ -86,7 +88,9 @@ func main() {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	// TODO: Gracefully close all Gateway connections
+	// Gracefully close all Gateway connections
+	sessionMgr.Stop()
+
 	// TODO: Close WebSocket hub
 
 	if err := srv.Shutdown(ctx); err != nil {
