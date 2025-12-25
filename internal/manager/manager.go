@@ -10,6 +10,7 @@ import (
 
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 	"github.com/pyyupsk/discord-stayonline/internal/gateway"
+	"github.com/pyyupsk/discord-stayonline/internal/webhook"
 )
 
 // Common errors
@@ -35,6 +36,7 @@ type SessionManager struct {
 	store        config.ConfigStore
 	sessionStore SessionStore
 	logger       *slog.Logger
+	webhook      *webhook.Notifier
 
 	sessions map[string]*Session
 	mu       sync.RWMutex
@@ -60,7 +62,7 @@ type Session struct {
 }
 
 // NewSessionManager creates a new session manager.
-func NewSessionManager(token string, store config.ConfigStore, sessionStore SessionStore, logger *slog.Logger) *SessionManager {
+func NewSessionManager(token string, store config.ConfigStore, sessionStore SessionStore, webhookNotifier *webhook.Notifier, logger *slog.Logger) *SessionManager {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -69,6 +71,7 @@ func NewSessionManager(token string, store config.ConfigStore, sessionStore Sess
 		token:        token,
 		store:        store,
 		sessionStore: sessionStore,
+		webhook:      webhookNotifier,
 		logger:       logger.With("component", "manager"),
 		sessions:     make(map[string]*Session),
 		ctx:          ctx,
@@ -401,10 +404,22 @@ func (m *SessionManager) setupClientCallbacks(session *Session, client *gateway.
 	serverID := session.serverEntry.ID
 
 	client.OnReady = func(sessionID string) {
+		// Check if this was a reconnection (backoff > 0 means we were reconnecting)
+		wasReconnecting := session.state.BackoffAttempt > 0
+
 		session.state.MarkConnected(sessionID)
 		m.notifyStatusChange(serverID, StatusConnected, "Connected")
 		m.saveSessionState(serverID, client)
 		m.joinVoiceChannel(session, client)
+
+		// Send webhook notification if this was a reconnection
+		if wasReconnecting && m.webhook != nil {
+			go m.webhook.NotifyUp(
+				serverID,
+				session.serverEntry.GuildName,
+				session.serverEntry.ChannelName,
+			)
+		}
 	}
 
 	client.OnDisconnect = func(_ int, reason string) {
@@ -513,6 +528,16 @@ func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.
 		serverID := session.serverEntry.ID
 		m.logger.Info("Connection lost, will reconnect", "server_id", serverID)
 		client.Close()
+
+		// Send webhook notification for connection loss
+		if m.webhook != nil {
+			go m.webhook.NotifyDown(
+				serverID,
+				session.serverEntry.GuildName,
+				session.serverEntry.ChannelName,
+				"Connection lost unexpectedly",
+			)
+		}
 
 		// Brief delay before reconnect to avoid hammering Discord
 		session.state.MarkBackoff()

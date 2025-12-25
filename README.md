@@ -51,12 +51,13 @@ Open <http://localhost:8080> in your browser.
 
 ## Configuration
 
-| Variable        | Required | Default | Description                          |
-| --------------- | -------- | ------- | ------------------------------------ |
-| `DISCORD_TOKEN` | Yes      | -       | Your Discord user token              |
-| `DATABASE_URL`  | No       | -       | PostgreSQL URL (for cloud platforms) |
-| `API_KEY`       | No       | -       | Protect web UI with authentication   |
-| `PORT`          | No       | `8080`  | HTTP server port                     |
+| Variable              | Required | Default | Description                              |
+| --------------------- | -------- | ------- | ---------------------------------------- |
+| `DISCORD_TOKEN`       | Yes      | -       | Your Discord user token                  |
+| `DATABASE_URL`        | No       | -       | PostgreSQL URL (for cloud platforms)     |
+| `API_KEY`             | No       | -       | Protect web UI with authentication       |
+| `PORT`                | No       | `8080`  | HTTP server port                         |
+| `DISCORD_WEBHOOK_URL` | No       | -       | Discord webhook for status notifications |
 
 ## Getting Your Discord Token
 

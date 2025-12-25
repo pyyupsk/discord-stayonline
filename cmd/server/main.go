@@ -15,6 +15,7 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/api"
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
+	"github.com/pyyupsk/discord-stayonline/internal/webhook"
 	"github.com/pyyupsk/discord-stayonline/internal/ws"
 )
 
@@ -24,9 +25,15 @@ func main() {
 	logger := initLogger()
 	token := getEnvOrDefault("DISCORD_TOKEN", "")
 	port := getEnvOrDefault("PORT", "8080")
+	webhookURL := os.Getenv("DISCORD_WEBHOOK_URL")
 
 	if token == "" {
 		slog.Warn("DISCORD_TOKEN not set - connections will fail until token is configured")
+	}
+
+	webhookNotifier := webhook.NewNotifier(webhookURL, logger)
+	if webhookNotifier != nil {
+		slog.Info("Discord webhook notifications enabled")
 	}
 
 	store, dbStore := initStore()
@@ -38,7 +45,7 @@ func main() {
 	slog.Info("Configuration loaded", "servers", len(cfg.Servers), "tos_acknowledged", cfg.TOSAcknowledged)
 
 	hub := initHub(logger, dbStore)
-	sessionMgr := initSessionManager(token, store, dbStore, hub, logger)
+	sessionMgr := initSessionManager(token, store, dbStore, hub, webhookNotifier, logger)
 
 	webFS, err := discordstayonline.GetWebFS()
 	if err != nil {
@@ -98,12 +105,12 @@ func initHub(logger *slog.Logger, dbStore *config.DBStore) *ws.Hub {
 	return hub
 }
 
-func initSessionManager(token string, store config.ConfigStore, dbStore *config.DBStore, hub *ws.Hub, logger *slog.Logger) *manager.SessionManager {
+func initSessionManager(token string, store config.ConfigStore, dbStore *config.DBStore, hub *ws.Hub, webhookNotifier *webhook.Notifier, logger *slog.Logger) *manager.SessionManager {
 	var sessionStore manager.SessionStore
 	if dbStore != nil {
 		sessionStore = &dbSessionStore{db: dbStore}
 	}
-	sessionMgr := manager.NewSessionManager(token, store, sessionStore, logger)
+	sessionMgr := manager.NewSessionManager(token, store, sessionStore, webhookNotifier, logger)
 	sessionMgr.OnStatusChange = func(serverID string, status manager.ConnectionStatus, message string) {
 		hub.BroadcastStatus(serverID, string(status), message)
 	}
