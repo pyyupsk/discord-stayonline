@@ -595,9 +595,14 @@ func (c *Client) handleInvalidSession(data json.RawMessage) {
 
 	if !resumable {
 		c.mu.Lock()
+		// Clear both active session and resume data
 		c.sessionID = ""
 		c.sequence = 0
+		c.resumeSessionID = ""
+		c.resumeSequence = 0
+		c.resumeGatewayURL = ""
 		c.mu.Unlock()
+		c.logger.Info("Session invalidated, will re-identify on next connect")
 	}
 
 	if c.OnError != nil {

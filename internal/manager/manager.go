@@ -202,7 +202,8 @@ func (m *SessionManager) Rejoin(serverID string) error {
 	m.mu.Unlock()
 
 	if !exists {
-		// Just join if not exists
+		// Delete any stale session data and join fresh
+		m.deleteSessionData(serverID)
 		return m.Join(serverID)
 	}
 
@@ -217,16 +218,29 @@ func (m *SessionManager) Rejoin(serverID string) error {
 	}
 	session.cancel()
 
-	// Remove old session
+	// Remove old session from memory
 	m.mu.Lock()
 	delete(m.sessions, serverID)
 	m.mu.Unlock()
 
+	// Delete session data from database for fresh start
+	m.deleteSessionData(serverID)
+
 	// Wait a bit for cleanup
 	time.Sleep(100 * time.Millisecond)
 
-	// Start new connection
+	// Start new connection with fresh IDENTIFY
 	return m.Join(serverID)
+}
+
+// deleteSessionData removes session data from the database.
+func (m *SessionManager) deleteSessionData(serverID string) {
+	if m.sessionStore == nil {
+		return
+	}
+	if err := m.sessionStore.DeleteSession(serverID); err != nil {
+		m.logger.Debug("Failed to delete session data", "server_id", serverID, "error", err)
+	}
 }
 
 // Exit closes a connection and stops reconnection.
@@ -261,10 +275,13 @@ func (m *SessionManager) Exit(serverID string) error {
 	}
 	session.cancel()
 
-	// Remove session
+	// Remove session from memory
 	m.mu.Lock()
 	delete(m.sessions, serverID)
 	m.mu.Unlock()
+
+	// Delete session data from database
+	m.deleteSessionData(serverID)
 
 	m.logger.Info("Session exited", "server_id", serverID)
 	return nil
@@ -398,6 +415,7 @@ func (m *SessionManager) setupClientCallbacks(session *Session, client *gateway.
 	client.OnError = func(err error) {
 		session.state.MarkError(err.Error())
 		m.notifyStatusChange(serverID, StatusError, err.Error())
+		m.handleInvalidSession(serverID, err)
 		m.handleFatalError(session, serverID, err)
 	}
 }
@@ -430,6 +448,19 @@ func (m *SessionManager) joinVoiceChannel(session *Session, client *gateway.Clie
 	ctx, cancel := context.WithTimeout(session.ctx, 5*time.Second)
 	defer cancel()
 	_ = client.SendVoiceStateUpdate(ctx, session.serverEntry.GuildID, session.serverEntry.ChannelID, true, true)
+}
+
+// handleInvalidSession handles invalid session errors by clearing stored session data.
+func (m *SessionManager) handleInvalidSession(serverID string, err error) {
+	if !errors.Is(err, gateway.ErrInvalidSession) {
+		return
+	}
+	m.logger.Info("Clearing invalid session data", "server_id", serverID)
+	if m.sessionStore != nil {
+		if delErr := m.sessionStore.DeleteSession(serverID); delErr != nil {
+			m.logger.Error("Failed to delete session", "server_id", serverID, "error", delErr)
+		}
+	}
 }
 
 // handleFatalError handles fatal Gateway errors.
