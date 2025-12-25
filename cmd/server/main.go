@@ -13,6 +13,7 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/api"
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
+	"github.com/pyyupsk/discord-stayonline/internal/ws"
 )
 
 func main() {
@@ -49,15 +50,28 @@ func main() {
 	}
 	slog.Info("Configuration loaded", "servers", len(cfg.Servers), "tos_acknowledged", cfg.TOSAcknowledged)
 
+	// Initialize WebSocket Hub
+	hub := ws.NewHub(logger)
+	go hub.Run()
+
 	// Initialize SessionManager
 	sessionMgr := manager.NewSessionManager(token, store, logger)
 
-	// TODO: Initialize WebSocket Hub and wire to SessionManager.OnStatusChange
-	// TODO: Start SessionManager auto-connect (after router setup)
+	// Wire SessionManager status changes to WebSocket Hub
+	sessionMgr.OnStatusChange = func(serverID string, status manager.ConnectionStatus, message string) {
+		hub.BroadcastStatus(serverID, string(status), message)
+	}
 
 	// Set up HTTP router
-	router := api.NewRouter(store, sessionMgr, logger)
+	router := api.NewRouter(store, sessionMgr, hub, logger)
 	handler := router.Setup()
+
+	// Start SessionManager auto-connect for servers with connect_on_start=true
+	go func() {
+		if err := sessionMgr.Start(); err != nil {
+			slog.Error("Failed to start session manager", "error", err)
+		}
+	}()
 
 	// Create server with timeouts
 	srv := &http.Server{
@@ -91,7 +105,8 @@ func main() {
 	// Gracefully close all Gateway connections
 	sessionMgr.Stop()
 
-	// TODO: Close WebSocket hub
+	// Close WebSocket hub
+	hub.Close()
 
 	if err := srv.Shutdown(ctx); err != nil {
 		slog.Error("Server forced to shutdown", "error", err)

@@ -3,9 +3,11 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"os"
 
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
+	"github.com/pyyupsk/discord-stayonline/internal/ws"
 )
 
 // Router sets up HTTP routes for the API.
@@ -13,11 +15,12 @@ type Router struct {
 	mux     *http.ServeMux
 	store   *config.Store
 	manager *manager.SessionManager
+	hub     *ws.Hub
 	logger  *slog.Logger
 }
 
 // NewRouter creates a new API router.
-func NewRouter(store *config.Store, mgr *manager.SessionManager, logger *slog.Logger) *Router {
+func NewRouter(store *config.Store, mgr *manager.SessionManager, hub *ws.Hub, logger *slog.Logger) *Router {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -25,6 +28,7 @@ func NewRouter(store *config.Store, mgr *manager.SessionManager, logger *slog.Lo
 		mux:     http.NewServeMux(),
 		store:   store,
 		manager: mgr,
+		hub:     hub,
 		logger:  logger,
 	}
 }
@@ -51,7 +55,13 @@ func (r *Router) Setup() http.Handler {
 		r.mux.HandleFunc("POST /api/servers/", serversHandler.ExecuteAction)
 	}
 
-	// TODO: WebSocket handler (/ws)
+	// WebSocket handler
+	if r.hub != nil {
+		allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
+		wsHandler := ws.NewHandler(r.hub, allowedOrigins, r.logger)
+		r.mux.HandleFunc("/ws", wsHandler.ServeHTTP)
+	}
+
 	// TODO: Static file handler (/)
 
 	return r.mux
