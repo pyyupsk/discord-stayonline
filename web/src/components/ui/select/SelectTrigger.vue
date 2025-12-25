@@ -15,7 +15,7 @@ const props = withDefaults(
       size?: "default" | "sm";
     }
   >(),
-  { size: "default" },
+  { class: undefined, size: "default" },
 );
 
 const delegatedProps = reactiveOmit(props, "class", "size");

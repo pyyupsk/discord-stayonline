@@ -8,6 +8,7 @@ import { Separator } from "reka-ui";
 import { cn } from "@/lib/utils";
 
 const props = withDefaults(defineProps<SeparatorProps & { class?: HTMLAttributes["class"] }>(), {
+  class: undefined,
   decorative: true,
   orientation: "horizontal",
 });

@@ -8,7 +8,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 
 type LogFilter = "all" | LogEntry["level"];
 
-const props = defineProps<{
+defineProps<{
   filter: LogFilter;
   logs: LogEntry[];
 }>();

@@ -22,6 +22,7 @@ const props = withDefaults(
     }
   >(),
   {
+    class: undefined,
     showCloseButton: true,
   },
 );

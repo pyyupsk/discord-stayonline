@@ -15,7 +15,7 @@ let reconnectAttempt = 0;
 let reconnectTimeout: null | ReturnType<typeof setTimeout> = null;
 
 export function useWebSocket() {
-  let onConfigChanged: ((config: Configuration) => void) | null = null;
+  let onConfigChanged: ((_config: Configuration) => void) | null = null;
 
   const filteredLogs = computed(() => {
     if (logFilter.value === "all") {
@@ -187,7 +187,7 @@ export function useWebSocket() {
     return serverStatuses.value.get(serverId) || "disconnected";
   }
 
-  function setOnConfigChanged(callback: (config: Configuration) => void) {
+  function setOnConfigChanged(callback: (_config: Configuration) => void) {
     onConfigChanged = callback;
   }
 
