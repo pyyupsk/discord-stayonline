@@ -227,4 +227,9 @@ tests/              - Integration tests
 
 ## License
 
-MIT
+[PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) - See [LICENSE](LICENSE) for details.
+
+- Personal and noncommercial use allowed
+- Modification and distribution allowed
+- No commercial use or selling
+- Attribution required
