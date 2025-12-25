@@ -10,6 +10,7 @@ import (
 	"syscall"
 	"time"
 
+	discordstayonline "github.com/pyyupsk/discord-stayonline"
 	"github.com/pyyupsk/discord-stayonline/internal/api"
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
@@ -62,8 +63,15 @@ func main() {
 		hub.BroadcastStatus(serverID, string(status), message)
 	}
 
+	// Get embedded web filesystem
+	webFS, err := discordstayonline.GetWebFS()
+	if err != nil {
+		slog.Error("Failed to get web filesystem", "error", err)
+		os.Exit(1)
+	}
+
 	// Set up HTTP router
-	router := api.NewRouter(store, sessionMgr, hub, logger)
+	router := api.NewRouter(store, sessionMgr, hub, webFS, logger)
 	handler := router.Setup()
 
 	// Start SessionManager auto-connect for servers with connect_on_start=true

@@ -1,6 +1,7 @@
 package api
 
 import (
+	"io/fs"
 	"log/slog"
 	"net/http"
 	"os"
@@ -16,11 +17,12 @@ type Router struct {
 	store   *config.Store
 	manager *manager.SessionManager
 	hub     *ws.Hub
+	webFS   fs.FS
 	logger  *slog.Logger
 }
 
 // NewRouter creates a new API router.
-func NewRouter(store *config.Store, mgr *manager.SessionManager, hub *ws.Hub, logger *slog.Logger) *Router {
+func NewRouter(store *config.Store, mgr *manager.SessionManager, hub *ws.Hub, webFS fs.FS, logger *slog.Logger) *Router {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -29,6 +31,7 @@ func NewRouter(store *config.Store, mgr *manager.SessionManager, hub *ws.Hub, lo
 		store:   store,
 		manager: mgr,
 		hub:     hub,
+		webFS:   webFS,
 		logger:  logger,
 	}
 }
@@ -62,7 +65,10 @@ func (r *Router) Setup() http.Handler {
 		r.mux.HandleFunc("/ws", wsHandler.ServeHTTP)
 	}
 
-	// TODO: Static file handler (/)
+	// Static file handler
+	if r.webFS != nil {
+		r.mux.Handle("/", http.FileServer(http.FS(r.webFS)))
+	}
 
 	return r.mux
 }
