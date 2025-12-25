@@ -35,7 +35,7 @@ test:
 
 # Run linter (Go + Web)
 lint:
-	golangci-lint run
+	go run github.com/golangci/golangci-lint/cmd/golangci-lint@latest run
 	cd web && bun run lint
 
 # Format code (Go + Web)
