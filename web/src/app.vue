@@ -1,16 +1,18 @@
 <script setup lang="ts">
-import { ref, onMounted, computed } from "vue";
+import { ref, onMounted, computed, watch } from "vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { Plus, Wifi, WifiOff } from "lucide-vue-next";
+import { Plus, Wifi, WifiOff, LogOut } from "lucide-vue-next";
 
+import LoginForm from "@/components/LoginForm.vue";
 import TosModal from "@/components/TosModal.vue";
 import GlobalStatus from "@/components/GlobalStatus.vue";
 import ServerCard from "@/components/ServerCard.vue";
 import ServerForm from "@/components/ServerForm.vue";
 import ActivityLog from "@/components/ActivityLog.vue";
 
+import { useAuth } from "@/composables/useAuth";
 import { useConfig } from "@/composables/useConfig";
 import { useWebSocket } from "@/composables/useWebSocket";
 import { useServers } from "@/composables/useServers";
@@ -36,20 +38,47 @@ const {
   addLog,
 } = useWebSocket();
 const { joinServer, rejoinServer, exitServer, isLoading } = useServers();
+const { authenticated, authRequired, checkAuth, logout, loading: authLoading } = useAuth();
 
 const showServerForm = ref(false);
 const editingServer = ref<ServerEntry | null>(null);
+const initialLoading = ref(true);
 
 const isConnected = computed(() => wsStatus.value === "connected");
+const needsLogin = computed(() => authRequired.value && !authenticated.value);
 
 onMounted(async () => {
-  await loadConfig();
+  await checkAuth();
 
-  if (config.value.tos_acknowledged) {
-    connect();
-    setOnConfigChanged((newConfig) => {
-      setConfig(newConfig);
-    });
+  if (authenticated.value || !authRequired.value) {
+    await loadConfig();
+
+    if (config.value.tos_acknowledged) {
+      connect();
+      setOnConfigChanged((newConfig) => {
+        setConfig(newConfig);
+      });
+    }
+  }
+
+  initialLoading.value = false;
+});
+
+async function handleLogout() {
+  await logout();
+}
+
+// Watch for successful login to load config
+watch(authenticated, async (isAuthenticated) => {
+  if (isAuthenticated && !initialLoading.value) {
+    await loadConfig();
+
+    if (config.value.tos_acknowledged) {
+      connect();
+      setOnConfigChanged((newConfig) => {
+        setConfig(newConfig);
+      });
+    }
   }
 });
 
@@ -136,26 +165,48 @@ async function handleExit(server: ServerEntry) {
 </script>
 
 <template>
-  <!-- TOS Modal -->
-  <TosModal
-    :open="!config.tos_acknowledged"
-    @acknowledge="handleAcknowledgeTos"
-  />
+  <!-- Loading State -->
+  <div v-if="initialLoading" class="flex min-h-screen items-center justify-center">
+    <p class="text-muted-foreground">Loading...</p>
+  </div>
 
-  <!-- Main App -->
-  <div v-if="config.tos_acknowledged" class="min-h-screen bg-background">
-    <!-- Header -->
-    <header class="border-b">
-      <div
-        class="container mx-auto flex items-center justify-between px-4 py-4"
-      >
-        <h1 class="text-xl font-semibold">Discord Stay Online</h1>
-        <Badge :variant="isConnected ? 'default' : 'secondary'" class="gap-1">
-          <component :is="isConnected ? Wifi : WifiOff" class="h-3 w-3" />
-          {{ isConnected ? "Connected" : "Disconnected" }}
-        </Badge>
-      </div>
-    </header>
+  <!-- Login Form -->
+  <LoginForm v-else-if="needsLogin" />
+
+  <!-- Main App (after auth) -->
+  <template v-else>
+    <!-- TOS Modal -->
+    <TosModal
+      :open="!config.tos_acknowledged"
+      @acknowledge="handleAcknowledgeTos"
+    />
+
+    <!-- Main App -->
+    <div v-if="config.tos_acknowledged" class="min-h-screen bg-background">
+      <!-- Header -->
+      <header class="border-b">
+        <div
+          class="container mx-auto flex items-center justify-between px-4 py-4"
+        >
+          <h1 class="text-xl font-semibold">Discord Stay Online</h1>
+          <div class="flex items-center gap-3">
+            <Badge :variant="isConnected ? 'default' : 'secondary'" class="gap-1">
+              <component :is="isConnected ? Wifi : WifiOff" class="h-3 w-3" />
+              {{ isConnected ? "Connected" : "Disconnected" }}
+            </Badge>
+            <Button
+              v-if="authRequired"
+              variant="ghost"
+              size="icon"
+              @click="handleLogout"
+              :disabled="authLoading"
+              title="Logout"
+            >
+              <LogOut class="h-4 w-4" />
+            </Button>
+          </div>
+        </div>
+      </header>
 
     <!-- Main Content -->
     <main class="container mx-auto space-y-6 px-4 py-6">
@@ -212,12 +263,13 @@ async function handleExit(server: ServerEntry) {
         <ActivityLog :logs="logs" @clear="clearLogs" />
       </section>
     </main>
-  </div>
+    </div>
 
-  <!-- Server Form Dialog -->
-  <ServerForm
-    v-model:open="showServerForm"
-    :server="editingServer"
-    @save="handleSaveServer"
-  />
+    <!-- Server Form Dialog -->
+    <ServerForm
+      v-model:open="showServerForm"
+      :server="editingServer"
+      @save="handleSaveServer"
+    />
+  </template>
 </template>
