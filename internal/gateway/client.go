@@ -110,6 +110,9 @@ func (c *Client) Connect(ctx context.Context) error {
 		return fmt.Errorf("dial gateway: %w", err)
 	}
 
+	// Set read limit to 1MB to handle large READY payloads
+	conn.SetReadLimit(1024 * 1024)
+
 	c.mu.Lock()
 	c.conn = conn
 	c.heartbeatStop = make(chan struct{})
