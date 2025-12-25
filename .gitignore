@@ -5,6 +5,10 @@
 bin/
 dist/
 
+# Web UI build artifacts
+web/node_modules/
+web/dist/
+
 # Environment and config files with secrets
 .env*
 !.env.example

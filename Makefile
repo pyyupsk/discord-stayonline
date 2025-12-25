@@ -1,4 +1,4 @@
-.PHONY: build run test docker-build clean fmt lint vet
+.PHONY: build run test docker-build clean fmt lint vet web-build web-dev
 
 # Binary output
 BINARY_NAME=discord-stayonline
@@ -10,9 +10,18 @@ GOFLAGS=-ldflags="-s -w"
 # Default target
 all: build
 
-# Build the binary
-build:
-	@echo "Building..."
+# Build web UI
+web-build:
+	@echo "Building web UI..."
+	cd web && npm install && npm run build
+
+# Run web dev server
+web-dev:
+	cd web && npm run dev
+
+# Build the binary (includes web build)
+build: web-build
+	@echo "Building Go binary..."
 	@mkdir -p $(BUILD_DIR)
 	go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/server
 
@@ -58,6 +67,7 @@ docker-run:
 clean:
 	@echo "Cleaning..."
 	@rm -rf $(BUILD_DIR)
+	@rm -rf web/dist web/node_modules
 	@rm -f coverage.out coverage.html
 	@go clean
 
@@ -76,7 +86,7 @@ lint:
 # Verify bundle size (constitution requirement: <500KB gzipped)
 check-bundle-size:
 	@echo "Checking web bundle size..."
-	@tar -czf /tmp/web-bundle.tar.gz web/
+	@tar -czf /tmp/web-bundle.tar.gz web/dist/
 	@size=$$(stat -c%s /tmp/web-bundle.tar.gz 2>/dev/null || stat -f%z /tmp/web-bundle.tar.gz 2>/dev/null); \
 	echo "Gzipped bundle size: $$size bytes"; \
 	if [ "$$size" -gt 512000 ]; then \
@@ -97,7 +107,9 @@ tidy:
 # Show help
 help:
 	@echo "Available targets:"
-	@echo "  build             - Build the binary"
+	@echo "  build             - Build the binary (includes web)"
+	@echo "  web-build         - Build web UI only"
+	@echo "  web-dev           - Run web dev server"
 	@echo "  run               - Run the server"
 	@echo "  test              - Run tests"
 	@echo "  coverage          - Run tests with coverage report"

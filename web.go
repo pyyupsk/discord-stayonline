@@ -6,10 +6,10 @@ import (
 	"io/fs"
 )
 
-//go:embed web/*
+//go:embed web/dist/*
 var WebFS embed.FS
 
-// GetWebFS returns the embedded web filesystem with the "web/" prefix stripped.
+// GetWebFS returns the embedded web filesystem with the "web/dist/" prefix stripped.
 func GetWebFS() (fs.FS, error) {
-	return fs.Sub(WebFS, "web")
+	return fs.Sub(WebFS, "web/dist")
 }
