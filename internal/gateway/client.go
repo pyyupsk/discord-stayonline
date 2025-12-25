@@ -510,6 +510,12 @@ func (c *Client) handleMessage(ctx context.Context, data []byte) error {
 	case OpDispatch:
 		return c.handleDispatch(ctx, msg.Type, msg.Data)
 
+	case OpHeartbeat:
+		c.logger.Debug("Received heartbeat request from Gateway")
+		if err := c.SendHeartbeat(ctx); err != nil {
+			c.logger.Error("Failed to send requested heartbeat", "error", err)
+		}
+
 	case OpHeartbeatAck:
 		c.handleHeartbeatAck()
 
@@ -687,6 +693,17 @@ func (c *Client) startHeartbeat(ctx context.Context) {
 		return
 	}
 
+	jitterDuration := randomJitter(interval * 2) // randomJitter returns 0-50%, so *2 gives 0-100%
+	c.logger.Debug("Waiting before first heartbeat", "jitter", jitterDuration)
+
+	select {
+	case <-stopChan:
+		return
+	case <-ctx.Done():
+		return
+	case <-time.After(jitterDuration):
+	}
+
 	// Send initial heartbeat
 	if err := c.SendHeartbeat(ctx); err != nil {
 		c.logger.Error("Failed to send initial heartbeat", "error", err)
@@ -720,8 +737,11 @@ func (c *Client) startHeartbeat(ctx context.Context) {
 
 			if time.Since(lastAck) > interval*2 {
 				c.logger.Warn("Missed heartbeat ACK, connection may be dead")
-				if c.OnDisconnect != nil {
-					c.OnDisconnect(0, "missed heartbeat ACK")
+				c.mu.RLock()
+				conn := c.conn
+				c.mu.RUnlock()
+				if conn != nil {
+					conn.Close(websocket.StatusProtocolError, "missed heartbeat ACK")
 				}
 				return
 			}
