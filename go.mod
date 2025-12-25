@@ -1,6 +1,6 @@
 module github.com/pyyupsk/discord-stayonline
 
-go 1.25.5
+go 1.23
 
 require github.com/coder/websocket v1.8.14
 
