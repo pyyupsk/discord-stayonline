@@ -500,6 +500,7 @@ func (m *SessionManager) handleConnectionError(session *Session, err error) bool
 
 // waitForDisconnection waits for session end and returns true if should stop.
 func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.Client) bool {
+	disconnected := client.Disconnected()
 	select {
 	case <-session.ctx.Done():
 		client.Close()
@@ -507,6 +508,26 @@ func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.
 	case <-session.stopReconnect:
 		client.Close()
 		return true
+	case <-disconnected:
+		// Connection ended, should reconnect
+		serverID := session.serverEntry.ID
+		m.logger.Info("Connection lost, will reconnect", "server_id", serverID)
+		client.Close()
+
+		// Brief delay before reconnect to avoid hammering Discord
+		session.state.MarkBackoff()
+		m.notifyStatusChange(serverID, StatusBackoff, "Reconnecting...")
+		delay := gateway.CalculateBackoff(session.state.BackoffAttempt)
+		m.logger.Info("Waiting before reconnect", "server_id", serverID, "delay", delay)
+
+		select {
+		case <-session.ctx.Done():
+			return true
+		case <-session.stopReconnect:
+			return true
+		case <-time.After(delay):
+			return false
+		}
 	}
 }
 

@@ -82,8 +82,9 @@ type Client struct {
 	heartbeatStop     chan struct{}
 
 	// Message handling
-	readStop chan struct{}
-	readDone chan struct{}
+	readStop     chan struct{}
+	readDone     chan struct{}
+	disconnected chan struct{} // Closed when connection ends (for external listeners)
 
 	// Status callbacks
 	OnReady       func(sessionID string)
@@ -181,6 +182,7 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.heartbeatStop = make(chan struct{})
 	c.readStop = make(chan struct{})
 	c.readDone = make(chan struct{})
+	c.disconnected = make(chan struct{})
 	c.mu.Unlock()
 
 	// Start read loop
@@ -429,7 +431,16 @@ func (c *Client) SendVoiceStateUpdate(ctx context.Context, guildID, channelID st
 
 // readLoop continuously reads messages from the Gateway.
 func (c *Client) readLoop(ctx context.Context) {
-	defer close(c.readDone)
+	defer func() {
+		close(c.readDone)
+		// Signal external listeners that connection ended
+		c.mu.Lock()
+		if c.disconnected != nil {
+			close(c.disconnected)
+			c.disconnected = nil
+		}
+		c.mu.Unlock()
+	}()
 
 	for {
 		select {
@@ -728,4 +739,12 @@ func (c *Client) Sequence() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.sequence
+}
+
+// Disconnected returns a channel that is closed when the connection ends.
+// Use this to detect when reconnection is needed.
+func (c *Client) Disconnected() <-chan struct{} {
+	c.mu.RLock()
+	defer c.mu.RUnlock()
+	return c.disconnected
 }
