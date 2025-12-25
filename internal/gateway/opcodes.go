@@ -74,21 +74,20 @@ type ReadyData struct {
 }
 
 // IdentifyData is the payload for OP 2 (Identify).
-// MANUAL REVIEW: Verify these fields match Discord's current requirements.
-// The properties field uses $ prefixes as per Discord documentation.
 type IdentifyData struct {
-	Token      string             `json:"token"`
-	Properties IdentifyProperties `json:"properties"`
-	Compress   bool               `json:"compress,omitempty"`
-	LargeThreshold int            `json:"large_threshold,omitempty"`
+	Token          string             `json:"token"`
+	Properties     IdentifyProperties `json:"properties"`
+	Presence       *PresenceData      `json:"presence,omitempty"`
+	Compress       bool               `json:"compress,omitempty"`
+	LargeThreshold int                `json:"large_threshold,omitempty"`
 }
 
 // IdentifyProperties contains client identification info.
-// MANUAL REVIEW: These values should appear as a legitimate client.
+// Note: User tokens use keys without $ prefix (unlike bot tokens).
 type IdentifyProperties struct {
-	OS      string `json:"$os"`      // Operating system
-	Browser string `json:"$browser"` // Browser identification
-	Device  string `json:"$device"`  // Device identification
+	OS      string `json:"os"`      // Operating system
+	Browser string `json:"browser"` // Browser identification
+	Device  string `json:"device"`  // Device identification
 }
 
 // PresenceData is the payload for OP 3 (Presence Update).

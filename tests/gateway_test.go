@@ -381,9 +381,9 @@ func TestGatewayIdentify(t *testing.T) {
 		"d": map[string]interface{}{
 			"token": "test-token",
 			"properties": map[string]string{
-				"$os":      "linux",
-				"$browser": "test",
-				"$device":  "test",
+				"os":      "Windows",
+				"browser": "Discord Client",
+				"device":  "",
 			},
 		},
 	}
@@ -589,9 +589,9 @@ func TestFullConnectionLifecycle(t *testing.T) {
 		"d": map[string]interface{}{
 			"token": "test-token",
 			"properties": map[string]string{
-				"$os":      "linux",
-				"$browser": "test",
-				"$device":  "test",
+				"os":      "Windows",
+				"browser": "Discord Client",
+				"device":  "",
 			},
 		},
 	}

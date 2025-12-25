@@ -150,8 +150,12 @@ func (c *Client) Close() error {
 }
 
 // SendIdentify sends the IDENTIFY payload to Discord.
-// MANUAL REVIEW: Verify these properties match current Discord client expectations.
 func (c *Client) SendIdentify(ctx context.Context) error {
+	return c.SendIdentifyWithStatus(ctx, "online")
+}
+
+// SendIdentifyWithStatus sends the IDENTIFY payload with a specific status.
+func (c *Client) SendIdentifyWithStatus(ctx context.Context, status string) error {
 	c.mu.RLock()
 	conn := c.conn
 	c.mu.RUnlock()
@@ -168,12 +172,16 @@ func (c *Client) SendIdentify(ctx context.Context) error {
 		Data: IdentifyData{
 			Token: c.token,
 			Properties: IdentifyProperties{
-				OS:      "linux",
-				Browser: "discord-stayonline",
-				Device:  "discord-stayonline",
+				OS:      "Windows",
+				Browser: "Discord Client",
+				Device:  "",
 			},
-			Compress:       false,
-			LargeThreshold: 50,
+			Presence: &PresenceData{
+				Status:     status,
+				Since:      new(int64), // 0 = not idle
+				Activities: []Activity{},
+				AFK:        false,
+			},
 		},
 	}
 
@@ -182,7 +190,7 @@ func (c *Client) SendIdentify(ctx context.Context) error {
 		return fmt.Errorf("marshal identify: %w", err)
 	}
 
-	c.logger.Debug("Sending IDENTIFY")
+	c.logger.Debug("Sending IDENTIFY", "status", status)
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
