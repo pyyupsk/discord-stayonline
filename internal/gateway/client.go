@@ -626,10 +626,24 @@ func (c *Client) handleInvalidSession(data json.RawMessage) {
 		c.resumeSessionID = ""
 		c.resumeSequence = 0
 		c.resumeGatewayURL = ""
+		conn := c.conn
 		c.mu.Unlock()
-		c.logger.Info("Session invalidated, will re-identify on next connect")
+		c.logger.Info("Session invalidated, closing connection to re-identify")
+
+		if c.OnError != nil {
+			c.OnError(ErrInvalidSession)
+		}
+
+		// Close the WebSocket connection to trigger a read error in readLoop.
+		// This will cause the read loop to exit and close the disconnected channel,
+		// which triggers the manager's reconnection logic with a fresh IDENTIFY.
+		if conn != nil {
+			conn.Close(websocket.StatusNormalClosure, "invalid session - will reconnect")
+		}
+		return
 	}
 
+	// Resumable invalid session - just notify, connection will continue
 	if c.OnError != nil {
 		c.OnError(ErrInvalidSession)
 	}
