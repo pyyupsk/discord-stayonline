@@ -1,65 +1,44 @@
+# syntax=docker/dockerfile:1
+
 # Web build stage
 FROM oven/bun:1-alpine AS web-builder
-
 WORKDIR /app/web
-
-# Copy web package files
 COPY web/package.json web/bun.lock ./
 RUN bun install --frozen-lockfile
-
-# Copy web source and build
 COPY web/ ./
 RUN bun run build
 
 # Go build stage
 FROM golang:1.23-alpine AS builder
-
-# Install build dependencies
-RUN apk add --no-cache git ca-certificates
-
 WORKDIR /app
 
 # Copy go mod files first for better caching
 COPY go.mod go.sum ./
-RUN go mod download
+RUN --mount=type=cache,target=/go/pkg/mod \
+    go mod download
 
-# Copy source code
+# Copy source code and web assets
 COPY . .
-
-# Copy built web assets from web-builder
 COPY --from=web-builder /app/web/dist ./web/dist
 
 # Build binary with optimizations
-RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/server ./cmd/server
+RUN --mount=type=cache,target=/go/pkg/mod \
+    --mount=type=cache,target=/root/.cache/go-build \
+    CGO_ENABLED=0 GOOS=linux go build -ldflags="-s -w" -o /app/server ./cmd/server
 
-# Runtime stage
-FROM alpine:3.19
-
-# Install ca-certificates for HTTPS
-RUN apk add --no-cache ca-certificates tzdata
+# Runtime stage - use distroless for minimal attack surface
+FROM gcr.io/distroless/static-debian12:nonroot
 
 WORKDIR /app
 
 # Copy binary from builder
 COPY --from=builder /app/server /app/server
 
-# Create non-root user and data directory
-RUN adduser -D -u 1000 appuser && \
-    mkdir -p /data && \
-    chown appuser:appuser /data
-
-USER appuser
-
 # Expose port
 EXPOSE 8080
 
 # Set environment defaults
 ENV PORT=8080
-ENV CONFIG_PATH=/data/config.json
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD wget --no-verbose --tries=1 --spider http://localhost:8080/health || exit 1
 
 # Run the binary
 ENTRYPOINT ["/app/server"]
