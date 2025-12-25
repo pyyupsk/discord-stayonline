@@ -317,7 +317,7 @@ func (m *SessionManager) runSession(session *Session) {
 			// Join voice channel if configured (presence is already set in IDENTIFY)
 			if session.serverEntry.ChannelID != "" {
 				ctx, cancel := context.WithTimeout(session.ctx, 5*time.Second)
-				client.SendVoiceStateUpdate(ctx, session.serverEntry.GuildID, session.serverEntry.ChannelID, true, true)
+				_ = client.SendVoiceStateUpdate(ctx, session.serverEntry.GuildID, session.serverEntry.ChannelID, true, true)
 				cancel()
 			}
 		}

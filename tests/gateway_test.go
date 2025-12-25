@@ -24,9 +24,6 @@ type MockGatewayServer struct {
 	onConnect       func()
 	onIdentify      func(data json.RawMessage)
 	onHeartbeat     func(seq *int)
-	closeCode       int
-	closeReason     string
-	shouldClose     bool
 }
 
 // NewMockGatewayServer creates a new mock Gateway server.
@@ -199,7 +196,7 @@ func (m *MockGatewayServer) handleMessage(ctx context.Context, data []byte, t *t
 		}
 
 		// Send READY response
-		m.SendReady(ctx, "test-session-123")
+		_ = m.SendReady(ctx, "test-session-123")
 
 	case gateway.OpHeartbeat:
 		m.mu.Lock()
@@ -209,7 +206,7 @@ func (m *MockGatewayServer) handleMessage(ctx context.Context, data []byte, t *t
 
 		// Parse sequence from heartbeat
 		var seq *int
-		json.Unmarshal(msg.Data, &seq)
+		_ = json.Unmarshal(msg.Data, &seq)
 
 		if m.onHeartbeat != nil {
 			m.onHeartbeat(seq)
@@ -224,7 +221,7 @@ func (m *MockGatewayServer) handleMessage(ctx context.Context, data []byte, t *t
 		conn := m.conn
 		m.mu.Unlock()
 		if conn != nil {
-			conn.Write(ctx, websocket.MessageText, ackData)
+			_ = conn.Write(ctx, websocket.MessageText, ackData)
 		}
 
 		t.Logf("received heartbeat #%d", count)

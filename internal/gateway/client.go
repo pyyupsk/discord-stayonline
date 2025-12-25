@@ -476,7 +476,7 @@ func (c *Client) handleReconnect() {
 func (c *Client) handleInvalidSession(data json.RawMessage) {
 	// Data is a boolean indicating if the session is resumable
 	var resumable bool
-	json.Unmarshal(data, &resumable)
+	_ = json.Unmarshal(data, &resumable) // ignore error, default to false
 
 	if !resumable {
 		c.mu.Lock()

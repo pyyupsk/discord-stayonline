@@ -114,7 +114,7 @@ func (m *mockGatewayServer) handleMessage(ctx context.Context, data []byte) {
 				"d":  false,
 			}
 			data, _ := json.Marshal(invalid)
-			conn.Write(ctx, websocket.MessageText, data)
+			_ = conn.Write(ctx, websocket.MessageText, data)
 		} else if sendReadyOnIdent {
 			ready := map[string]interface{}{
 				"op": OpDispatch,
@@ -127,7 +127,7 @@ func (m *mockGatewayServer) handleMessage(ctx context.Context, data []byte) {
 				},
 			}
 			data, _ := json.Marshal(ready)
-			conn.Write(ctx, websocket.MessageText, data)
+			_ = conn.Write(ctx, websocket.MessageText, data)
 		}
 
 	case OpHeartbeat:
@@ -139,7 +139,7 @@ func (m *mockGatewayServer) handleMessage(ctx context.Context, data []byte) {
 			"op": OpHeartbeatAck,
 		}
 		ackData, _ := json.Marshal(ack)
-		conn.Write(ctx, websocket.MessageText, ackData)
+		_ = conn.Write(ctx, websocket.MessageText, ackData)
 
 	case OpPresenceUpdate:
 		// Acknowledge presence update
@@ -424,7 +424,7 @@ func TestHandleHello(t *testing.T) {
 	}
 
 	var msg GatewayMessage
-	json.Unmarshal(data, &msg)
+	_ = json.Unmarshal(data, &msg)
 
 	err = client.handleHello(ctx, msg.Data)
 	if err != nil {
@@ -451,7 +451,7 @@ func TestSequenceUpdates(t *testing.T) {
 
 	// Message with sequence
 	msg := `{"op": 0, "s": 42, "t": "UNKNOWN_EVENT", "d": {}}`
-	client.handleMessage(context.Background(), []byte(msg))
+	_ = client.handleMessage(context.Background(), []byte(msg))
 
 	if client.Sequence() != 42 {
 		t.Errorf("expected sequence 42, got %d", client.Sequence())
@@ -481,7 +481,7 @@ func TestConnectToMockServer(t *testing.T) {
 	var hello struct {
 		Op int `json:"op"`
 	}
-	json.Unmarshal(data, &hello)
+	_ = json.Unmarshal(data, &hello)
 
 	if hello.Op != OpHello {
 		t.Errorf("expected OpHello, got %d", hello.Op)
@@ -548,7 +548,7 @@ func TestSendIdentifyWithConnection(t *testing.T) {
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
-	conn.Read(ctx)
+	_, _, _ = conn.Read(ctx)
 
 	client := NewClient("test-token", nil)
 	client.conn = conn
@@ -568,7 +568,7 @@ func TestSendIdentifyWithConnection(t *testing.T) {
 		Op   int    `json:"op"`
 		Type string `json:"t"`
 	}
-	json.Unmarshal(data, &ready)
+	_ = json.Unmarshal(data, &ready)
 
 	if ready.Op != OpDispatch || ready.Type != "READY" {
 		t.Errorf("expected READY dispatch, got op=%d, type=%s", ready.Op, ready.Type)
@@ -589,7 +589,7 @@ func TestSendHeartbeatWithConnection(t *testing.T) {
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
-	conn.Read(ctx)
+	_, _, _ = conn.Read(ctx)
 
 	client := NewClient("test-token", nil)
 	client.conn = conn
@@ -609,7 +609,7 @@ func TestSendHeartbeatWithConnection(t *testing.T) {
 	var ack struct {
 		Op int `json:"op"`
 	}
-	json.Unmarshal(data, &ack)
+	_ = json.Unmarshal(data, &ack)
 
 	if ack.Op != OpHeartbeatAck {
 		t.Errorf("expected HeartbeatAck, got op=%d", ack.Op)
@@ -630,7 +630,7 @@ func TestSendPresenceUpdateWithConnection(t *testing.T) {
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
-	conn.Read(ctx)
+	_, _, _ = conn.Read(ctx)
 
 	client := NewClient("test-token", nil)
 	client.conn = conn
@@ -655,7 +655,7 @@ func TestSendVoiceStateUpdateWithConnection(t *testing.T) {
 	defer conn.Close(websocket.StatusNormalClosure, "")
 
 	// Read HELLO
-	conn.Read(ctx)
+	_, _, _ = conn.Read(ctx)
 
 	client := NewClient("test-token", nil)
 	client.conn = conn
