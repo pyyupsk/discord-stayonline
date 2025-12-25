@@ -80,6 +80,7 @@ func (m *SessionManager) Start() error {
 	}
 
 	// Auto-connect servers with connect_on_start=true
+	// Each client uses unique OS/Browser properties to avoid Discord rate limits
 	for _, server := range cfg.Servers {
 		if server.ConnectOnStart {
 			go func(s config.ServerEntry) {

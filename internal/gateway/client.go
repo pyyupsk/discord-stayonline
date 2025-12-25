@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	"github.com/coder/websocket"
@@ -17,6 +18,28 @@ const (
 	GatewayURL     = "wss://gateway.discord.gg/?v=10&encoding=json"
 	GatewayVersion = 10
 )
+
+// Client properties rotation to avoid rate limits.
+// Discord rate-limits IDENTIFY requests per token, but different
+// client properties are treated as different "devices".
+var (
+	clientCounter uint64
+	osList        = []string{"Windows", "Linux", "Mac OS X", "iOS", "Android"}
+	browserList   = []string{"Discord Client", "Chrome", "Firefox", "Safari", "Edge", "Opera", "Brave"}
+)
+
+// getClientProperties returns unique OS/Browser/Device for each client.
+// With 5 OS × 7 browsers = 35 base combinations, plus unique device suffix
+// for unlimited unique client properties.
+func getClientProperties(index int) (os, browser, device string) {
+	os = osList[index%len(osList)]
+	browser = browserList[(index/len(osList))%len(browserList)]
+	// After 35 combinations, add device suffix to keep properties unique
+	if index >= len(osList)*len(browserList) {
+		device = fmt.Sprintf("device-%d", index)
+	}
+	return
+}
 
 // Client connection states
 const (
@@ -36,8 +59,9 @@ var (
 
 // Client represents a Discord Gateway WebSocket client.
 type Client struct {
-	token  string
-	status string // Presence status (online, idle, dnd)
+	token       string
+	status      string // Presence status (online, idle, dnd)
+	clientIndex int    // Unique index for client properties rotation
 
 	conn  *websocket.Conn
 	state int
@@ -72,11 +96,14 @@ func NewClient(token string, logger *slog.Logger) *Client {
 	if logger == nil {
 		logger = slog.Default()
 	}
+	// Assign unique index for client properties rotation
+	index := int(atomic.AddUint64(&clientCounter, 1) - 1)
 	return &Client{
-		token:  token,
-		status: "online", // Default status
-		state:  StateDisconnected,
-		logger: logger.With("component", "gateway"),
+		token:       token,
+		clientIndex: index,
+		status:      "online", // Default status
+		state:       StateDisconnected,
+		logger:      logger.With("component", "gateway"),
 	}
 }
 
@@ -203,11 +230,14 @@ func (c *Client) SendIdentifyWithStatus(ctx context.Context, status string) erro
 		Op: OpIdentify,
 		Data: IdentifyData{
 			Token: c.token,
-			Properties: IdentifyProperties{
-				OS:      "Windows",
-				Browser: "Discord Client",
-				Device:  "",
-			},
+			Properties: func() IdentifyProperties {
+				os, browser, device := getClientProperties(c.clientIndex)
+				return IdentifyProperties{
+					OS:      os,
+					Browser: browser,
+					Device:  device,
+				}
+			}(),
 			Presence: &PresenceData{
 				Status:     status,
 				Since:      new(int64), // 0 = not idle
