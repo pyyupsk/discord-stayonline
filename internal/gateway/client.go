@@ -214,14 +214,11 @@ func (c *Client) Close() error {
 		c.readStop = nil
 	}
 
-	// Clear disconnected channel (may already be closed by readLoop)
-	c.disconnected = nil
-
 	// Close WebSocket first to unblock any pending reads
 	conn := c.conn
 	c.conn = nil
 	readDone := c.readDone
-	c.readDone = nil
+	// Don't set readDone to nil here - let readLoop's defer close it
 
 	c.mu.Unlock()
 
@@ -238,6 +235,11 @@ func (c *Client) Close() error {
 			// Timeout waiting for read loop
 		}
 	}
+
+	// Clean up disconnected channel reference (readLoop's defer handles closing)
+	c.mu.Lock()
+	c.disconnected = nil
+	c.mu.Unlock()
 
 	c.notifyStateChange(StateClosed)
 	return nil
@@ -435,9 +437,13 @@ func (c *Client) SendVoiceStateUpdate(ctx context.Context, guildID, channelID st
 // readLoop continuously reads messages from the Gateway.
 func (c *Client) readLoop(ctx context.Context) {
 	defer func() {
-		close(c.readDone)
-		// Stop heartbeat goroutine when read loop ends
 		c.mu.Lock()
+		// Close readDone to signal we're done (if not already nil from Close())
+		if c.readDone != nil {
+			close(c.readDone)
+			c.readDone = nil
+		}
+		// Stop heartbeat goroutine when read loop ends
 		if c.heartbeatStop != nil {
 			close(c.heartbeatStop)
 			c.heartbeatStop = nil
