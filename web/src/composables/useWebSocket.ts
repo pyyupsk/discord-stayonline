@@ -33,6 +33,20 @@ function disconnect() {
 export function useWebSocket() {
   let onConfigChanged: ((config: Configuration) => void) | null = null;
 
+  async function loadStatuses() {
+    try {
+      const response = await fetch("/api/statuses");
+      if (!response.ok) return;
+
+      const statuses: Record<string, ConnectionStatus> = await response.json();
+      for (const [serverId, status] of Object.entries(statuses)) {
+        serverStatuses.value.set(serverId, status);
+      }
+    } catch {
+      // Silently fail - will get updates via WebSocket
+    }
+  }
+
   function connect() {
     if (ws?.readyState === WebSocket.OPEN) return;
 
@@ -50,6 +64,9 @@ export function useWebSocket() {
         addLog("info", "WebSocket connected");
 
         ws?.send(JSON.stringify({ type: "subscribe", channel: "logs" }));
+
+        // Load current statuses after connecting
+        loadStatuses();
       };
 
       ws.onclose = () => {
@@ -158,6 +175,7 @@ export function useWebSocket() {
     logs,
     connect,
     disconnect,
+    loadStatuses,
     addLog,
     clearLogs,
     getServerStatus,

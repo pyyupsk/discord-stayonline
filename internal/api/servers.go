@@ -26,6 +26,25 @@ func NewServersHandler(mgr *manager.SessionManager, logger *slog.Logger) *Server
 	}
 }
 
+// GetStatuses handles GET /api/statuses requests.
+// Returns current connection status for all sessions.
+func (h *ServersHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	statuses := h.manager.GetAllStatuses()
+
+	// Convert to map[string]string for JSON
+	result := make(map[string]string)
+	for id, status := range statuses {
+		result[id] = string(status)
+	}
+
+	writeJSON(w, http.StatusOK, result)
+}
+
 // ExecuteAction handles POST /api/servers/{id}/action requests.
 func (h *ServersHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {

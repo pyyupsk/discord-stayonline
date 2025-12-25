@@ -71,6 +71,7 @@ func (r *Router) Setup() http.Handler {
 	// Server action handlers (protected)
 	if r.manager != nil {
 		serversHandler := NewServersHandler(r.manager, r.logger)
+		r.mux.HandleFunc("GET /api/statuses", r.auth.Protect(serversHandler.GetStatuses))
 		r.mux.HandleFunc("POST /api/servers/", r.auth.Protect(serversHandler.ExecuteAction))
 	}
 
