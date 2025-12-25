@@ -129,9 +129,9 @@ func (c *Client) Connect(ctx context.Context) error {
 // Close gracefully closes the Gateway connection.
 func (c *Client) Close() error {
 	c.mu.Lock()
-	defer c.mu.Unlock()
 
 	if c.state == StateClosed || c.state == StateDisconnected {
+		c.mu.Unlock()
 		return nil
 	}
 
@@ -140,21 +140,35 @@ func (c *Client) Close() error {
 	// Stop heartbeat
 	if c.heartbeatStop != nil {
 		close(c.heartbeatStop)
+		c.heartbeatStop = nil
 	}
 
-	// Stop read loop
+	// Stop read loop signal
 	if c.readStop != nil {
 		close(c.readStop)
+		c.readStop = nil
 	}
 
-	// Wait for read loop to finish
-	if c.readDone != nil {
-		<-c.readDone
+	// Close WebSocket first to unblock any pending reads
+	conn := c.conn
+	c.conn = nil
+	readDone := c.readDone
+	c.readDone = nil
+
+	c.mu.Unlock()
+
+	// Close connection outside of lock to unblock read loop
+	if conn != nil {
+		conn.Close(websocket.StatusGoingAway, "client closing")
 	}
 
-	// Close WebSocket
-	if c.conn != nil {
-		c.conn.Close(websocket.StatusGoingAway, "client closing")
+	// Wait for read loop to finish with timeout
+	if readDone != nil {
+		select {
+		case <-readDone:
+		case <-time.After(5 * time.Second):
+			// Timeout waiting for read loop
+		}
 	}
 
 	c.notifyStateChange(StateClosed)
