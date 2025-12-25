@@ -4,7 +4,7 @@
     'use strict';
 
     // State
-    let config = { servers: [], tos_acknowledged: false };
+    let config = { servers: [], status: 'online', tos_acknowledged: false };
     let ws = null;
     let wsReconnectAttempt = 0;
     const MAX_WS_RECONNECT = 10;
@@ -27,6 +27,7 @@
     const confirmYesBtn = document.getElementById('confirm-yes-btn');
     const confirmNoBtn = document.getElementById('confirm-no-btn');
     const connectionStatus = document.getElementById('connection-status');
+    const globalStatusSelect = document.getElementById('global-status');
 
     // Initialization
     async function init() {
@@ -95,14 +96,25 @@
     function showApp() {
         tosModal.classList.add('hidden');
         app.classList.remove('hidden');
+        updateGlobalStatusUI();
         renderServers();
         connectWebSocket();
+    }
+
+    // Update global status dropdown to match config
+    function updateGlobalStatusUI() {
+        if (globalStatusSelect && config.status) {
+            globalStatusSelect.value = config.status;
+        }
     }
 
     // Event Listeners
     function setupEventListeners() {
         // TOS acknowledgment - only via click, not keyboard
         tosAcknowledgeBtn.addEventListener('click', acknowledgeTOS);
+
+        // Global status change
+        globalStatusSelect.addEventListener('change', handleGlobalStatusChange);
 
         // Server form
         addServerBtn.addEventListener('click', showAddServerForm);
@@ -114,6 +126,33 @@
 
         // Confirmation modal
         confirmNoBtn.addEventListener('click', hideConfirmModal);
+    }
+
+    // Handle global status change
+    async function handleGlobalStatusChange(e) {
+        const newStatus = e.target.value;
+
+        try {
+            const response = await fetch('/api/config', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ servers: config.servers, status: newStatus })
+            });
+
+            if (response.ok) {
+                config.status = newStatus;
+                log('info', `Presence status changed to ${newStatus}`);
+            } else {
+                const error = await response.json();
+                log('error', 'Failed to update status: ' + error.message);
+                // Revert the dropdown
+                globalStatusSelect.value = config.status;
+            }
+        } catch (error) {
+            log('error', 'Failed to update status: ' + error.message);
+            // Revert the dropdown
+            globalStatusSelect.value = config.status;
+        }
     }
 
     // Server List
@@ -168,7 +207,6 @@
         document.getElementById('server-id').value = server.id;
         document.getElementById('guild-id').value = server.guild_id;
         document.getElementById('channel-id').value = server.channel_id;
-        document.getElementById('status').value = server.status;
         document.getElementById('connect-on-start').checked = server.connect_on_start;
         serverFormSection.classList.remove('hidden');
     }
@@ -189,7 +227,6 @@
             id: serverId || generateId(),
             guild_id: formData.get('guild_id'),
             channel_id: formData.get('channel_id'),
-            status: formData.get('status'),
             connect_on_start: document.getElementById('connect-on-start').checked,
             priority: 1
         };
@@ -417,6 +454,7 @@
 
             case 'config_changed':
                 config = msg.config;
+                updateGlobalStatusUI();
                 renderServers();
                 log('info', 'Configuration updated');
                 break;

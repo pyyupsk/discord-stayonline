@@ -233,6 +233,37 @@ section {
     font-size: 1.25rem;
 }
 
+/* Global Settings */
+#global-settings {
+    padding: 1rem 1.5rem;
+}
+
+.global-status-selector {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.global-status-selector label {
+    font-weight: 500;
+    color: var(--text-secondary);
+}
+
+.global-status-selector select {
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border-color);
+    border-radius: 4px;
+    background-color: var(--bg-tertiary);
+    color: var(--text-primary);
+    font-size: 1rem;
+    cursor: pointer;
+}
+
+.global-status-selector select:focus {
+    outline: none;
+    border-color: var(--accent-info);
+}
+
 /* Server List */
 #servers-list {
     display: flex;

@@ -41,6 +41,21 @@
         </header>
 
         <main>
+            <!-- Global Settings -->
+            <section id="global-settings">
+                <div class="section-header">
+                    <h2>Account Status</h2>
+                </div>
+                <div class="global-status-selector">
+                    <label for="global-status">Presence Status (applies to all connections)</label>
+                    <select id="global-status">
+                        <option value="online">Online</option>
+                        <option value="idle">Idle</option>
+                        <option value="dnd">Do Not Disturb</option>
+                    </select>
+                </div>
+            </section>
+
             <!-- Server List -->
             <section id="servers-section">
                 <div class="section-header">
@@ -66,14 +81,6 @@
                         <input type="text" id="channel-id" name="channel_id" required pattern="[0-9]{17,19}"
                                placeholder="234567890123456789">
                         <small>Right-click voice channel → Copy ID</small>
-                    </div>
-                    <div class="form-group">
-                        <label for="status">Presence Status</label>
-                        <select id="status" name="status">
-                            <option value="online">Online</option>
-                            <option value="idle">Idle</option>
-                            <option value="dnd">Do Not Disturb</option>
-                        </select>
                     </div>
                     <div class="form-group">
                         <label class="checkbox-label">
