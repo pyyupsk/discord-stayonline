@@ -79,6 +79,8 @@ func (r *Router) Setup() http.Handler {
 	discordHandler := NewDiscordHandler(r.logger)
 	r.mux.HandleFunc("GET /api/discord/server-info", r.auth.Protect(discordHandler.GetServerInfo))
 	r.mux.HandleFunc("POST /api/discord/bulk-info", r.auth.Protect(discordHandler.GetBulkServerInfo))
+	r.mux.HandleFunc("GET /api/discord/guilds", r.auth.Protect(discordHandler.GetUserGuilds))
+	r.mux.HandleFunc("GET /api/discord/guilds/", r.auth.Protect(discordHandler.GetGuildChannels))
 
 	// Logs handler (protected)
 	if r.hub != nil {

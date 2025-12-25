@@ -38,3 +38,15 @@ export interface WebSocketMessage {
   config?: Configuration;
   code?: string;
 }
+
+export interface GuildInfo {
+  id: string;
+  name: string;
+  icon?: string;
+}
+
+export interface VoiceChannelInfo {
+  id: string;
+  name: string;
+  position: number;
+}

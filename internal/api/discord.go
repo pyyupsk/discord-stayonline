@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"strings"
 	"sync"
 	"time"
 )
@@ -176,6 +177,97 @@ func (h *DiscordHandler) GetServerInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, info)
+}
+
+// GetUserGuilds handles GET /api/discord/guilds
+// Returns list of guilds the user is a member of.
+func (h *DiscordHandler) GetUserGuilds(w http.ResponseWriter, r *http.Request) {
+	cacheKey := "user:guilds"
+	if cached, ok := h.getFromCache(cacheKey); ok {
+		writeJSON(w, http.StatusOK, cached)
+		return
+	}
+
+	var guilds []GuildInfo
+	if err := h.fetchFromDiscord("/users/@me/guilds", &guilds); err != nil {
+		h.logger.Error("Failed to fetch user guilds", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error":   "discord_error",
+			"message": "Failed to fetch guilds from Discord",
+		})
+		return
+	}
+
+	h.setCache(cacheKey, guilds)
+	writeJSON(w, http.StatusOK, guilds)
+}
+
+// VoiceChannelInfo contains voice channel information.
+type VoiceChannelInfo struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Position int    `json:"position"`
+}
+
+// Discord channel types
+const (
+	ChannelTypeGuildVoice = 2
+	ChannelTypeGuildStage = 13
+)
+
+// GetGuildChannels handles GET /api/discord/guilds/{id}/channels
+// Returns list of voice channels for the specified guild.
+func (h *DiscordHandler) GetGuildChannels(w http.ResponseWriter, r *http.Request) {
+	// Extract guild ID from path: /api/discord/guilds/{id}/channels
+	path := r.URL.Path
+	path = strings.TrimPrefix(path, "/api/discord/guilds/")
+	path = strings.TrimSuffix(path, "/channels")
+	guildID := path
+
+	if guildID == "" || strings.Contains(guildID, "/") {
+		writeJSON(w, http.StatusBadRequest, map[string]string{
+			"error":   "invalid_request",
+			"message": "Guild ID is required",
+		})
+		return
+	}
+
+	cacheKey := "guild:channels:" + guildID
+	if cached, ok := h.getFromCache(cacheKey); ok {
+		writeJSON(w, http.StatusOK, cached)
+		return
+	}
+
+	var channels []struct {
+		ID       string `json:"id"`
+		Name     string `json:"name"`
+		Type     int    `json:"type"`
+		Position int    `json:"position"`
+	}
+
+	if err := h.fetchFromDiscord("/guilds/"+guildID+"/channels", &channels); err != nil {
+		h.logger.Error("Failed to fetch guild channels", "guild_id", guildID, "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error":   "discord_error",
+			"message": "Failed to fetch channels from Discord",
+		})
+		return
+	}
+
+	// Filter for voice and stage channels only
+	var voiceChannels []VoiceChannelInfo
+	for _, ch := range channels {
+		if ch.Type == ChannelTypeGuildVoice || ch.Type == ChannelTypeGuildStage {
+			voiceChannels = append(voiceChannels, VoiceChannelInfo{
+				ID:       ch.ID,
+				Name:     ch.Name,
+				Position: ch.Position,
+			})
+		}
+	}
+
+	h.setCache(cacheKey, voiceChannels)
+	writeJSON(w, http.StatusOK, voiceChannels)
 }
 
 // GetBulkServerInfo handles POST /api/discord/bulk-info with array of {guild_id, channel_id}
