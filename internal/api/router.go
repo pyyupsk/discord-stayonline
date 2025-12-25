@@ -36,7 +36,12 @@ func (r *Router) Setup() http.Handler {
 	tosHandler := NewTOSHandler(r.store, r.logger)
 	r.mux.HandleFunc("POST /api/acknowledge-tos", tosHandler.AcknowledgeTOS)
 
-	// TODO: Config handlers (/api/config)
+	// Config handlers
+	configHandler := NewConfigHandler(r.store, r.logger)
+	r.mux.HandleFunc("GET /api/config", configHandler.GetConfig)
+	r.mux.HandleFunc("POST /api/config", configHandler.ReplaceConfig)
+	r.mux.HandleFunc("PUT /api/config", configHandler.UpdateConfig)
+
 	// TODO: Server action handlers (/api/servers/{id}/action)
 	// TODO: WebSocket handler (/ws)
 	// TODO: Static file handler (/)
