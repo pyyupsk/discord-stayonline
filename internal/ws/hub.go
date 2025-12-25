@@ -100,13 +100,16 @@ func NewErrorMessage(code, message, serverID string) *ErrorMessage {
 
 // LogEntry represents a stored log entry.
 type LogEntry struct {
-	Level     LogLevel  `json:"level"`
+	Level     string    `json:"level"`
 	Message   string    `json:"message"`
 	Timestamp time.Time `json:"timestamp"`
 }
 
-// MaxLogEntries is the maximum number of log entries to store.
-const MaxLogEntries = 500
+// LogStore is the interface for persisting logs.
+type LogStore interface {
+	AddLog(level, message string) error
+	GetLogs(level string) ([]LogEntry, error)
+}
 
 // Hub manages WebSocket client connections and message broadcasting.
 type Hub struct {
@@ -116,14 +119,11 @@ type Hub struct {
 	unregister chan *Client
 	mu         sync.RWMutex
 	logger     *slog.Logger
-
-	// Log storage
-	logs   []LogEntry
-	logsMu sync.RWMutex
+	logStore   LogStore
 }
 
 // NewHub creates a new WebSocket hub.
-func NewHub(logger *slog.Logger) *Hub {
+func NewHub(logger *slog.Logger, logStore LogStore) *Hub {
 	if logger == nil {
 		logger = slog.Default()
 	}
@@ -133,7 +133,7 @@ func NewHub(logger *slog.Logger) *Hub {
 		register:   make(chan *Client),
 		unregister: make(chan *Client),
 		logger:     logger.With("component", "ws-hub"),
-		logs:       make([]LogEntry, 0, MaxLogEntries),
+		logStore:   logStore,
 	}
 }
 
@@ -200,12 +200,12 @@ func (h *Hub) BroadcastStatus(serverID, status, message string) {
 func (h *Hub) BroadcastLog(level LogLevel, message string) {
 	logMsg := NewLogMessage(level, message)
 
-	// Store log entry
-	h.storeLog(LogEntry{
-		Level:     level,
-		Message:   message,
-		Timestamp: logMsg.Timestamp,
-	})
+	// Store log entry to database
+	if h.logStore != nil {
+		if err := h.logStore.AddLog(string(level), message); err != nil {
+			h.logger.Error("Failed to store log entry", "error", err)
+		}
+	}
 
 	data, err := json.Marshal(logMsg)
 	if err != nil {
@@ -222,39 +222,18 @@ func (h *Hub) BroadcastLog(level LogLevel, message string) {
 	h.mu.RUnlock()
 }
 
-// storeLog adds a log entry to the storage, removing oldest if at capacity.
-func (h *Hub) storeLog(entry LogEntry) {
-	h.logsMu.Lock()
-	defer h.logsMu.Unlock()
-
-	if len(h.logs) >= MaxLogEntries {
-		// Remove oldest entries (keep last MaxLogEntries-1)
-		h.logs = h.logs[1:]
-	}
-	h.logs = append(h.logs, entry)
-}
-
-// GetLogs returns stored log entries, optionally filtered by level.
-// If level is empty, returns all logs.
+// GetLogs returns stored log entries from the database, optionally filtered by level.
 func (h *Hub) GetLogs(level string) []LogEntry {
-	h.logsMu.RLock()
-	defer h.logsMu.RUnlock()
-
-	if level == "" {
-		// Return a copy
-		result := make([]LogEntry, len(h.logs))
-		copy(result, h.logs)
-		return result
+	if h.logStore == nil {
+		return nil
 	}
 
-	// Filter by level
-	var result []LogEntry
-	for _, log := range h.logs {
-		if string(log.Level) == level {
-			result = append(result, log)
-		}
+	logs, err := h.logStore.GetLogs(level)
+	if err != nil {
+		h.logger.Error("Failed to get logs from store", "error", err)
+		return nil
 	}
-	return result
+	return logs
 }
 
 // BroadcastError sends an error message to all clients.

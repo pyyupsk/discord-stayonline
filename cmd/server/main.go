@@ -74,8 +74,12 @@ func main() {
 	}
 	slog.Info("Configuration loaded", "servers", len(cfg.Servers), "tos_acknowledged", cfg.TOSAcknowledged)
 
-	// Initialize WebSocket Hub
-	hub := ws.NewHub(logger)
+	// Initialize WebSocket Hub with log store
+	var logStore ws.LogStore
+	if dbStore != nil {
+		logStore = &dbLogStore{db: dbStore}
+	}
+	hub := ws.NewHub(logger, logStore)
 	go hub.Run()
 
 	// Initialize SessionManager
@@ -149,4 +153,31 @@ func main() {
 	}
 
 	slog.Info("Server stopped")
+}
+
+// dbLogStore adapts config.DBStore to ws.LogStore interface.
+type dbLogStore struct {
+	db *config.DBStore
+}
+
+func (s *dbLogStore) AddLog(level, message string) error {
+	return s.db.AddLog(level, message)
+}
+
+func (s *dbLogStore) GetLogs(level string) ([]ws.LogEntry, error) {
+	logs, err := s.db.GetLogs(level)
+	if err != nil {
+		return nil, err
+	}
+
+	// Convert config.LogEntry to ws.LogEntry
+	result := make([]ws.LogEntry, len(logs))
+	for i, log := range logs {
+		result[i] = ws.LogEntry{
+			Level:     log.Level,
+			Message:   log.Message,
+			Timestamp: log.Timestamp,
+		}
+	}
+	return result, nil
 }

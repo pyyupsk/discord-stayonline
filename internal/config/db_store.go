@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"sync"
+	"time"
 
 	_ "github.com/lib/pq"
 )
@@ -78,6 +79,28 @@ func (s *DBStore) migrate() error {
 	_, err = s.db.Exec(`
 		CREATE INDEX IF NOT EXISTS idx_servers_guild_id ON servers(guild_id);
 		CREATE INDEX IF NOT EXISTS idx_servers_priority ON servers(priority);
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create logs table
+	_, err = s.db.Exec(`
+		CREATE TABLE IF NOT EXISTS logs (
+			id SERIAL PRIMARY KEY,
+			level VARCHAR(10) NOT NULL,
+			message TEXT NOT NULL,
+			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
+	// Create index for log filtering and cleanup
+	_, err = s.db.Exec(`
+		CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
+		CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
 	`)
 	if err != nil {
 		return err
@@ -337,4 +360,85 @@ func (s *DBStore) Save(cfg *Configuration) error {
 // Close closes the database connection.
 func (s *DBStore) Close() error {
 	return s.db.Close()
+}
+
+// LogEntry represents a stored log entry.
+type LogEntry struct {
+	Level     string    `json:"level"`
+	Message   string    `json:"message"`
+	Timestamp time.Time `json:"timestamp"`
+}
+
+// MaxLogEntries is the maximum number of log entries to keep in the database.
+const MaxLogEntries = 1000
+
+// AddLog inserts a new log entry and trims old entries if needed.
+func (s *DBStore) AddLog(level, message string) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`
+		INSERT INTO logs (level, message) VALUES ($1, $2)
+	`, level, message)
+	if err != nil {
+		return err
+	}
+
+	// Trim old logs to keep only the last MaxLogEntries
+	_, err = s.db.Exec(`
+		DELETE FROM logs WHERE id NOT IN (
+			SELECT id FROM logs ORDER BY created_at DESC LIMIT $1
+		)
+	`, MaxLogEntries)
+
+	return err
+}
+
+// GetLogs retrieves log entries, optionally filtered by level.
+// Returns logs ordered from oldest to newest.
+func (s *DBStore) GetLogs(level string) ([]LogEntry, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	var rows *sql.Rows
+	var err error
+
+	if level == "" {
+		rows, err = s.db.Query(`
+			SELECT level, message, created_at FROM logs
+			ORDER BY created_at ASC
+			LIMIT $1
+		`, MaxLogEntries)
+	} else {
+		rows, err = s.db.Query(`
+			SELECT level, message, created_at FROM logs
+			WHERE level = $1
+			ORDER BY created_at ASC
+			LIMIT $2
+		`, level, MaxLogEntries)
+	}
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var logs []LogEntry
+	for rows.Next() {
+		var log LogEntry
+		if err := rows.Scan(&log.Level, &log.Message, &log.Timestamp); err != nil {
+			return nil, err
+		}
+		logs = append(logs, log)
+	}
+
+	return logs, rows.Err()
+}
+
+// ClearLogs removes all log entries from the database.
+func (s *DBStore) ClearLogs() error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+
+	_, err := s.db.Exec(`DELETE FROM logs`)
+	return err
 }

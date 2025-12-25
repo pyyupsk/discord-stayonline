@@ -1,4 +1,4 @@
-.PHONY: build run test docker-build clean fmt lint vet web-build web-dev
+.PHONY: dev start build test lint fmt clean docker help
 
 # Binary output
 BINARY_NAME=discord-stayonline
@@ -7,52 +7,70 @@ BUILD_DIR=bin
 # Go settings
 GOFLAGS=-ldflags="-s -w"
 
-# Default target
-all: build
+# ============================================================================
+# Main Commands
+# ============================================================================
 
-# Build web UI
-web-build:
-	@echo "Building web UI..."
-	cd web && npm install && npm run build
+# Development mode - run with hot reload feel (rebuilds on each run)
+dev:
+	@echo "Starting development server..."
+	go run ./cmd/server
 
-# Run web dev server
-web-dev:
-	cd web && npm run dev
+# Start the built binary
+start: build
+	@echo "Starting production server..."
+	./$(BUILD_DIR)/$(BINARY_NAME)
 
-# Build the binary (includes web build)
-build: web-build
-	@echo "Building Go binary..."
+# Build for production
+build:
+	@echo "Building..."
+	@cd web && npm install && npm run build
 	@mkdir -p $(BUILD_DIR)
 	go build $(GOFLAGS) -o $(BUILD_DIR)/$(BINARY_NAME) ./cmd/server
-
-# Run the server
-run:
-	go run ./cmd/server
+	@echo "Done! Binary: $(BUILD_DIR)/$(BINARY_NAME)"
 
 # Run tests
 test:
 	go test -v ./...
 
-# Run tests with coverage
-coverage:
-	go test -coverprofile=coverage.out ./...
-	go tool cover -html=coverage.out -o coverage.html
-	@echo "Coverage report: coverage.html"
+# Run linter
+lint:
+	golangci-lint run
 
-# Check gateway package coverage (constitution requirement: >=80%)
-coverage-gateway:
-	go test -coverprofile=coverage.out ./internal/gateway/...
-	go tool cover -func=coverage.out | grep total
+# Format code
+fmt:
+	go fmt ./...
+	@cd web && npm run lint 2>/dev/null || true
+
+# Clean build artifacts
+clean:
+	@rm -rf $(BUILD_DIR) web/dist web/node_modules coverage.out coverage.html
+	@go clean
+	@echo "Cleaned!"
+
+# ============================================================================
+# Web UI Commands
+# ============================================================================
+
+# Run web dev server with hot reload
+web-dev:
+	cd web && npm run dev
+
+# Build web UI only
+web-build:
+	cd web && npm install && npm run build
+
+# Install web dependencies
+web-install:
+	cd web && npm install
+
+# ============================================================================
+# Docker Commands
+# ============================================================================
 
 # Build Docker image
-docker-build:
+docker:
 	docker build -t ghcr.io/pyyupsk/discord-stayonline:latest .
-
-# Build multi-arch Docker image
-docker-build-multiarch:
-	docker buildx build --platform linux/amd64,linux/arm64 \
-		-t ghcr.io/pyyupsk/discord-stayonline:latest \
-		--push .
 
 # Run Docker container
 docker-run:
@@ -63,63 +81,92 @@ docker-run:
 		-v $$(pwd)/config.json:/app/config.json \
 		ghcr.io/pyyupsk/discord-stayonline:latest
 
-# Clean build artifacts
-clean:
-	@echo "Cleaning..."
-	@rm -rf $(BUILD_DIR)
-	@rm -rf web/dist web/node_modules
-	@rm -f coverage.out coverage.html
-	@go clean
+# Build multi-arch Docker image
+docker-push:
+	docker buildx build --platform linux/amd64,linux/arm64 \
+		-t ghcr.io/pyyupsk/discord-stayonline:latest \
+		--push .
 
-# Format code
-fmt:
-	go fmt ./...
+# ============================================================================
+# CI/Quality Commands
+# ============================================================================
 
-# Run go vet
-vet:
-	go vet ./...
+# Run all checks (CI pipeline)
+ci: lint test check-size
+	@echo "All checks passed!"
 
-# Run linter (requires golangci-lint)
-lint:
-	golangci-lint run
+# Check code quality
+check: fmt lint test
 
-# Verify bundle size (constitution requirement: <500KB gzipped)
-check-bundle-size:
-	@echo "Checking web bundle size..."
+# Run tests with coverage
+coverage:
+	go test -coverprofile=coverage.out ./...
+	go tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report: coverage.html"
+
+# Check gateway package coverage (>=80% required)
+coverage-gateway:
+	go test -coverprofile=coverage.out ./internal/gateway/...
+	go tool cover -func=coverage.out | grep total
+
+# Verify bundle size (<500KB gzipped)
+check-size:
+	@echo "Checking bundle size..."
 	@tar -czf /tmp/web-bundle.tar.gz web/dist/
 	@size=$$(stat -c%s /tmp/web-bundle.tar.gz 2>/dev/null || stat -f%z /tmp/web-bundle.tar.gz 2>/dev/null); \
-	echo "Gzipped bundle size: $$size bytes"; \
+	echo "Gzipped: $$size bytes"; \
 	if [ "$$size" -gt 512000 ]; then \
-		echo "ERROR: Bundle size exceeds 500KB limit"; \
+		echo "ERROR: Exceeds 500KB limit"; \
 		exit 1; \
 	fi
 	@rm -f /tmp/web-bundle.tar.gz
 
-# Install development dependencies
-dev-deps:
+# ============================================================================
+# Setup Commands
+# ============================================================================
+
+# Install all dependencies
+install:
+	go mod download
+	cd web && npm install
+	@echo "Dependencies installed!"
+
+# Install dev tools
+install-tools:
 	go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
 
-# Tidy and verify dependencies
+# Tidy dependencies
 tidy:
 	go mod tidy
 	go mod verify
 
-# Show help
+# ============================================================================
+# Help
+# ============================================================================
+
 help:
-	@echo "Available targets:"
-	@echo "  build             - Build the binary (includes web)"
-	@echo "  web-build         - Build web UI only"
-	@echo "  web-dev           - Run web dev server"
-	@echo "  run               - Run the server"
-	@echo "  test              - Run tests"
-	@echo "  coverage          - Run tests with coverage report"
-	@echo "  coverage-gateway  - Check gateway package coverage"
-	@echo "  docker-build      - Build Docker image"
-	@echo "  docker-run        - Run Docker container"
-	@echo "  clean             - Clean build artifacts"
-	@echo "  fmt               - Format code"
-	@echo "  vet               - Run go vet"
-	@echo "  lint              - Run linter"
-	@echo "  check-bundle-size - Verify web bundle <500KB"
-	@echo "  tidy              - Tidy dependencies"
-	@echo "  help              - Show this help"
+	@echo ""
+	@echo "Usage: make [target]"
+	@echo ""
+	@echo "Development:"
+	@echo "  dev          Run development server"
+	@echo "  web          Run web UI dev server (hot reload)"
+	@echo "  build        Build for production"
+	@echo "  start        Build and run production server"
+	@echo ""
+	@echo "Testing:"
+	@echo "  test         Run tests"
+	@echo "  lint         Run linter"
+	@echo "  fmt          Format code"
+	@echo "  check        Run fmt + lint + test"
+	@echo "  coverage     Generate coverage report"
+	@echo ""
+	@echo "Docker:"
+	@echo "  docker       Build Docker image"
+	@echo "  docker-run   Run Docker container"
+	@echo "  docker-push  Build and push multi-arch image"
+	@echo ""
+	@echo "Setup:"
+	@echo "  install      Install all dependencies"
+	@echo "  clean        Remove build artifacts"
+	@echo ""
