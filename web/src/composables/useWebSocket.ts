@@ -55,9 +55,9 @@ export function useWebSocket() {
       for (const log of serverLogs) {
         // Avoid duplicates
         if (!existingMessages.has(log.message)) {
+          const enriched = parseAndEnrichLogMessage(log.message, log.level);
           logs.value.push({
-            level: log.level,
-            message: log.message,
+            ...enriched,
             time: new Date(log.timestamp),
           });
         }
@@ -247,6 +247,53 @@ export function useWebSocket() {
   };
 }
 
+function createFriendlyMessage(
+  action: LogEntry["action"],
+  serverName: string | undefined,
+  originalContent: string,
+): string {
+  const name = serverName || "Server";
+
+  switch (action) {
+    case "backoff":
+      return `Reconnecting to ${name}...`;
+    case "connected":
+      return `${name} is now online`;
+    case "connecting":
+      return `Connecting to ${name}...`;
+    case "disconnected":
+      return `${name} disconnected`;
+    case "error":
+      return `${name}: ${originalContent}`;
+    default:
+      return originalContent;
+  }
+}
+
+function detectActionFromMessage(content: string): LogEntry["action"] {
+  const lower = content.toLowerCase();
+
+  if (lower.includes("connected") && !lower.includes("disconnected")) {
+    return "connected";
+  }
+  if (lower.includes("connecting")) {
+    return "connecting";
+  }
+  if (lower.includes("disconnected") || lower.includes("exit")) {
+    return "disconnected";
+  }
+  if (lower.includes("reconnect") || lower.includes("waiting")) {
+    return "backoff";
+  }
+  if (lower.includes("error") || lower.includes("failed")) {
+    return "error";
+  }
+  if (lower.includes("config")) {
+    return "config";
+  }
+  return "system";
+}
+
 function disconnect() {
   if (reconnectTimeout) {
     clearTimeout(reconnectTimeout);
@@ -312,6 +359,38 @@ function mapStatusToAction(status: ConnectionStatus): LogEntry["action"] {
     default:
       return "system";
   }
+}
+
+// Parse backend log messages like "[server_id] Connected" and enrich with action/serverName
+function parseAndEnrichLogMessage(
+  message: string,
+  level: LogEntry["level"],
+): Omit<LogEntry, "time"> {
+  // Try to extract server ID from message format: [server_id] message
+  const match = new RegExp(/^\[([^\]]+)\]\s*(.+)$/).exec(message);
+
+  if (!match) {
+    // No server ID in message - return as system log
+    return {
+      action: "system",
+      level,
+      message,
+    };
+  }
+
+  const serverId = match[1] ?? "";
+  const content = match[2] ?? "";
+  const serverName = getServerName(serverId);
+  const action = detectActionFromMessage(content);
+  const friendlyMessage = createFriendlyMessage(action, serverName, content);
+
+  return {
+    action,
+    level,
+    message: friendlyMessage,
+    serverId,
+    serverName,
+  };
 }
 
 function updateServerNamesFromConfig(config: Configuration) {
