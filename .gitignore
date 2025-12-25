@@ -1,0 +1,34 @@
+# Binary output
+*.exe
+*.test
+*.out
+bin/
+dist/
+
+# Environment and config files with secrets
+.env
+config.json
+
+# IDE and editor
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Test and coverage
+coverage.out
+coverage.html
+
+# Vendor (if using)
+vendor/
+
+# Go build cache
+.go/
+
+# Debug files
+*.log
