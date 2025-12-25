@@ -22,33 +22,12 @@ A self-hosted service that maintains Discord account presence by managing persis
 - Web UI for configuration and monitoring
 - Real-time status updates via WebSocket
 - Automatic reconnection with exponential backoff
-- Health endpoint for uptime monitoring
 - Single binary deployment with embedded assets
 - Docker support
-- API key authentication (optional)
-- Auto-fetch server/channel names from Discord
 
 ## Quick Start
 
-### From Source
-
-```bash
-# Clone and build
-git clone https://github.com/pyyupsk/discord-stayonline.git
-cd discord-stayonline
-make build
-
-# Configure
-cp .env.example .env
-# Edit .env with your Discord token
-
-# Run
-make start
-```
-
-Open <http://localhost:8080> in your browser.
-
-### Docker
+### Docker (Recommended)
 
 ```bash
 docker run -d \
@@ -58,40 +37,26 @@ docker run -d \
   ghcr.io/pyyupsk/discord-stayonline:latest
 ```
 
-## Environment Variables
-
-| Variable          | Required | Default       | Description                                       |
-| ----------------- | -------- | ------------- | ------------------------------------------------- |
-| `DISCORD_TOKEN`   | Yes      | -             | Your Discord user token                           |
-| `DATABASE_URL`    | No       | -             | PostgreSQL connection URL (for persistent config) |
-| `API_KEY`         | No       | -             | API key for web UI authentication                 |
-| `PORT`            | No       | `8080`        | HTTP server port                                  |
-| `CONFIG_PATH`     | No       | `config.json` | Path to config file (if not using DATABASE_URL)   |
-| `ALLOWED_ORIGINS` | No       | `localhost`   | Comma-separated allowed origins for WebSocket     |
-
-### PostgreSQL Storage (Recommended for cloud deployments)
-
-Set `DATABASE_URL` to use PostgreSQL for config storage instead of a file. This is recommended for platforms like Render where the filesystem is ephemeral.
+### From Source
 
 ```bash
-DATABASE_URL=postgres://user:password@host:5432/dbname
+git clone https://github.com/pyyupsk/discord-stayonline.git
+cd discord-stayonline
+cp .env.example .env
+# Edit .env with your Discord token
+make build && make start
 ```
 
-The app auto-creates the required table on startup.
+Open <http://localhost:8080> in your browser.
 
-### Authentication
+## Configuration
 
-To protect the web UI with an API key:
-
-```bash
-# Generate a secure key
-openssl rand -hex 32
-
-# Add to .env
-API_KEY=your_generated_key_here
-```
-
-When `API_KEY` is set, users must enter the key to access the dashboard. The key is stored in an HTTP-only cookie (24h expiry).
+| Variable        | Required | Default | Description                          |
+| --------------- | -------- | ------- | ------------------------------------ |
+| `DISCORD_TOKEN` | Yes      | -       | Your Discord user token              |
+| `DATABASE_URL`  | No       | -       | PostgreSQL URL (for cloud platforms) |
+| `API_KEY`       | No       | -       | Protect web UI with authentication   |
+| `PORT`          | No       | `8080`  | HTTP server port                     |
 
 ## Getting Your Discord Token
 
@@ -103,136 +68,12 @@ When `API_KEY` is set, users must enter the key to access the dashboard. The key
 6. Look for the `authorization` header in the request headers
 7. Copy the token value
 
-## Health Monitoring
+## Documentation
 
-Set up UptimeRobot or similar to ping:
-
-```http
-GET http://your-server:8080/health
-```
-
-Returns `200 OK` with JSON containing status, uptime, connections, and runtime info.
-
-## Development
-
-```bash
-# Run tests
-make test
-
-# Run with coverage
-make coverage
-
-# Format code
-make format
-
-# Run linter
-make lint
-```
-
-## API Reference
-
-All `/api/*` endpoints (except auth) require authentication when `API_KEY` is set.
-
-### Health Check
-
-```http
-GET /health
-Response: 200 OK, JSON with status, uptime, connections, runtime, memory info
-
-HEAD /health
-Response: 200 OK (for simple uptime checks)
-```
-
-### Authentication
-
-```http
-GET /api/auth/check
-Response: {"authenticated": bool, "auth_required": bool}
-
-POST /api/auth/login
-Body: {"api_key": "..."}
-Response: 200 OK (sets HTTP-only cookie)
-
-POST /api/auth/logout
-Response: 200 OK (clears cookie)
-```
-
-### TOS Acknowledgment
-
-```http
-POST /api/acknowledge-tos
-Body: {"acknowledged": true}
-Response: 200 OK
-```
-
-### Configuration
-
-```http
-GET /api/config
-Response: {"servers": [...], "status": "online|idle|dnd", "tos_acknowledged": bool}
-
-POST /api/config
-Body: {"servers": [...], "status": "..."}  // Full replacement (max 35 entries)
-
-PUT /api/config
-Body: {"servers": [...], "status": "..."}  // Partial update, merge by ID
-```
-
-### Server Actions
-
-```http
-POST /api/servers/{id}/action
-Body: {"action": "join" | "rejoin" | "exit"}
-```
-
-### Discord Info
-
-```http
-GET /api/discord/server-info?guild_id=...&channel_id=...
-Response: {"guild_id": "...", "guild_name": "...", "channel_id": "...", "channel_name": "..."}
-
-POST /api/discord/bulk-info
-Body: [{"guild_id": "...", "channel_id": "..."}, ...]
-Response: [{"guild_id": "...", "guild_name": "...", ...}, ...]
-```
-
-### WebSocket Status Updates
-
-```http
-WS /ws
-Messages: {"type": "status", "server_id": "...", "status": "...", "message": "..."}
-```
-
-## Architecture
-
-```filestree
-cmd/server/         - Entry point
-internal/
-  config/           - Configuration types and persistence
-  gateway/          - Discord Gateway WebSocket client
-  manager/          - Session management for multiple connections
-  api/              - HTTP API handlers
-  ws/               - WebSocket hub for UI updates
-  ui/               - Static asset embedding
-web/                - Frontend assets (HTML, JS, CSS)
-tests/              - Integration tests
-```
-
-### Connection States
-
-| Status         | Description                              |
-| -------------- | ---------------------------------------- |
-| `disconnected` | Not connected                            |
-| `connecting`   | Attempting to connect                    |
-| `connected`    | Successfully connected and authenticated |
-| `error`        | Connection failed with an error          |
-| `backoff`      | Waiting before reconnect attempt         |
+- [API Reference](docs/api.md)
+- [Architecture](docs/architecture.md)
+- [Development Guide](docs/development.md)
 
 ## License
 
 [PolyForm Noncommercial 1.0.0](https://polyformproject.org/licenses/noncommercial/1.0.0) - See [LICENSE](LICENSE) for details.
-
-- Personal and noncommercial use allowed
-- Modification and distribution allowed
-- No commercial use or selling
-- Attribution required
