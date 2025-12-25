@@ -1,0 +1,39 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
+bin/
+dist/
+*.exe
+*.test
+*.out
+
+# Environment and secrets
+.env
+.env.*
+!.env.example
+config.json
+
+# Documentation and specs
+*.md
+!README.md
+specs/
+docs/
+
+# Test and coverage
+coverage.out
+coverage.html
+
+# CI/CD
+.github/
+
+# Speckit
+.specify/
+.claude/
