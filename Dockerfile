@@ -43,8 +43,11 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/server /app/server
 
-# Create non-root user
-RUN adduser -D -u 1000 appuser
+# Create non-root user and data directory
+RUN adduser -D -u 1000 appuser && \
+    mkdir -p /data && \
+    chown appuser:appuser /data
+
 USER appuser
 
 # Expose port
@@ -52,6 +55,7 @@ EXPOSE 8080
 
 # Set environment defaults
 ENV PORT=8080
+ENV CONFIG_PATH=/data/config.json
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

@@ -45,7 +45,11 @@ func main() {
 	}
 
 	// Initialize ConfigStore
-	store := config.NewStore("config.json")
+	configPath := os.Getenv("CONFIG_PATH")
+	if configPath == "" {
+		configPath = "config.json"
+	}
+	store := config.NewStore(configPath)
 
 	// Load existing config or create default
 	cfg, err := store.Load()
