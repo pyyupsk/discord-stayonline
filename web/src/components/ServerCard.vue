@@ -83,7 +83,7 @@ const channelDisplay = computed(() => {
           @click="emit('join')"
           title="Join"
         >
-          <Play class="h-4 w-4" />
+          <Play />
         </Button>
         <Button
           variant="outline"
@@ -92,7 +92,7 @@ const channelDisplay = computed(() => {
           @click="emit('rejoin')"
           title="Rejoin"
         >
-          <RotateCcw class="h-4 w-4" />
+          <RotateCcw />
         </Button>
         <Button
           variant="outline"
@@ -101,10 +101,10 @@ const channelDisplay = computed(() => {
           @click="emit('exit')"
           title="Exit"
         >
-          <Square class="h-4 w-4" />
+          <Square />
         </Button>
         <Button variant="ghost" size="icon" @click="emit('edit')" title="Edit">
-          <Pencil class="h-4 w-4" />
+          <Pencil />
         </Button>
         <Button
           variant="ghost"
@@ -113,7 +113,7 @@ const channelDisplay = computed(() => {
           @click="emit('delete')"
           title="Delete"
         >
-          <Trash2 class="h-4 w-4" />
+          <Trash2 />
         </Button>
       </div>
     </CardContent>

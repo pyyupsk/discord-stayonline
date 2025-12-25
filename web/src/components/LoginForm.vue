@@ -54,7 +54,7 @@ async function handleSubmit() {
             class="w-full"
             :disabled="loading || !apiKey.trim()"
           >
-            <LogIn class="mr-2 h-4 w-4" />
+            <LogIn />
             {{ loading ? "Logging in..." : "Login" }}
           </Button>
         </form>

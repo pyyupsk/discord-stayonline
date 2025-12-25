@@ -199,11 +199,8 @@ async function handleExit(server: ServerEntry) {
         >
           <h1 class="text-xl font-semibold">Discord Stay Online</h1>
           <div class="flex items-center gap-3">
-            <Badge
-              :variant="isConnected ? 'default' : 'secondary'"
-              class="gap-1"
-            >
-              <component :is="isConnected ? Wifi : WifiOff" class="h-3 w-3" />
+            <Badge :variant="isConnected ? 'default' : 'secondary'">
+              <component :is="isConnected ? Wifi : WifiOff" />
               {{ isConnected ? "Connected" : "Disconnected" }}
             </Badge>
             <Button
@@ -214,7 +211,7 @@ async function handleExit(server: ServerEntry) {
               :disabled="authLoading"
               title="Logout"
             >
-              <LogOut class="h-4 w-4" />
+              <LogOut />
             </Button>
           </div>
         </div>
@@ -238,7 +235,7 @@ async function handleExit(server: ServerEntry) {
               @click="handleAddServer"
               :disabled="config.servers.length >= 15"
             >
-              <Plus class="mr-1 h-4 w-4" />
+              <Plus />
               Add Server
             </Button>
           </div>

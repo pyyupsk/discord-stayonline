@@ -40,7 +40,7 @@ function getLevelClass(level: LogEntry["level"]): string {
         class="h-7 px-2 text-xs"
         @click="emit('clear')"
       >
-        <Trash2 class="mr-1 h-3 w-3" />
+        <Trash2 />
         Clear
       </Button>
     </div>
