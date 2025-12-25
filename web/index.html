@@ -1,0 +1,116 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Discord Stay Online</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- TOS Modal -->
+    <div id="tos-modal" class="modal" role="dialog" aria-modal="true" aria-labelledby="tos-title">
+        <div class="modal-content">
+            <h1 id="tos-title">Terms of Service Warning</h1>
+            <div class="warning-box">
+                <p><strong>IMPORTANT: READ BEFORE PROCEEDING</strong></p>
+                <p>This tool uses Discord user tokens to maintain presence status. Using user tokens with automated tools <strong>may violate Discord's Terms of Service</strong> and could result in:</p>
+                <ul>
+                    <li>Account suspension</li>
+                    <li>Account termination</li>
+                    <li>Loss of access to Discord services</li>
+                </ul>
+                <p>By clicking the button below, you acknowledge:</p>
+                <ul>
+                    <li>You understand the risks involved with using user tokens</li>
+                    <li>You accept full responsibility for any consequences to your Discord account</li>
+                    <li>The authors are not responsible for any actions taken against your account</li>
+                </ul>
+            </div>
+            <button id="tos-acknowledge-btn" class="btn btn-danger">I Understand and Accept the Risks</button>
+        </div>
+    </div>
+
+    <!-- Main Application -->
+    <div id="app" class="hidden">
+        <header>
+            <h1>Discord Stay Online</h1>
+            <div id="connection-status" class="status-indicator disconnected">
+                <span class="status-dot"></span>
+                <span class="status-text">Disconnected</span>
+            </div>
+        </header>
+
+        <main>
+            <!-- Server List -->
+            <section id="servers-section">
+                <div class="section-header">
+                    <h2>Server Connections</h2>
+                    <button id="add-server-btn" class="btn btn-primary">Add Server</button>
+                </div>
+                <div id="servers-list"></div>
+            </section>
+
+            <!-- Add/Edit Server Form -->
+            <section id="server-form-section" class="hidden">
+                <h2 id="form-title">Add Server</h2>
+                <form id="server-form">
+                    <input type="hidden" id="server-id" name="id">
+                    <div class="form-group">
+                        <label for="guild-id">Guild ID (Server ID)</label>
+                        <input type="text" id="guild-id" name="guild_id" required pattern="[0-9]{17,19}"
+                               placeholder="123456789012345678">
+                        <small>Right-click server → Copy ID (Enable Developer Mode in Discord settings)</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="channel-id">Channel ID (Voice Channel)</label>
+                        <input type="text" id="channel-id" name="channel_id" required pattern="[0-9]{17,19}"
+                               placeholder="234567890123456789">
+                        <small>Right-click voice channel → Copy ID</small>
+                    </div>
+                    <div class="form-group">
+                        <label for="status">Presence Status</label>
+                        <select id="status" name="status">
+                            <option value="online">Online</option>
+                            <option value="idle">Idle</option>
+                            <option value="dnd">Do Not Disturb</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="connect-on-start" name="connect_on_start" checked>
+                            Connect automatically on startup
+                        </label>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn btn-primary">Save</button>
+                        <button type="button" id="cancel-form-btn" class="btn btn-secondary">Cancel</button>
+                    </div>
+                </form>
+            </section>
+
+            <!-- Log Panel -->
+            <section id="log-section">
+                <div class="section-header">
+                    <h2>Activity Log</h2>
+                    <button id="clear-log-btn" class="btn btn-secondary btn-small">Clear</button>
+                </div>
+                <div id="log-container"></div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Action Confirmation Modal -->
+    <div id="confirm-modal" class="modal hidden" role="dialog" aria-modal="true">
+        <div class="modal-content modal-small">
+            <h2 id="confirm-title">Confirm Action</h2>
+            <p id="confirm-message"></p>
+            <div class="modal-actions">
+                <button id="confirm-yes-btn" class="btn btn-danger">Yes</button>
+                <button id="confirm-no-btn" class="btn btn-secondary">No</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

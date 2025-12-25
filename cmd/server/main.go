@@ -9,6 +9,9 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/pyyupsk/discord-stayonline/internal/api"
+	"github.com/pyyupsk/discord-stayonline/internal/config"
 )
 
 func main() {
@@ -26,6 +29,7 @@ func main() {
 	if token == "" {
 		slog.Warn("DISCORD_TOKEN not set - connections will fail until token is configured")
 	}
+	_ = token // Will be used by SessionManager
 
 	// Get port from environment or use default
 	port := os.Getenv("PORT")
@@ -33,31 +37,30 @@ func main() {
 		port = "8080"
 	}
 
-	// TODO: Load config.json (create default if missing)
-	// TODO: Initialize ConfigStore
+	// Initialize ConfigStore
+	store := config.NewStore("config.json")
+
+	// Load existing config or create default
+	cfg, err := store.Load()
+	if err != nil {
+		slog.Error("Failed to load config", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("Configuration loaded", "servers", len(cfg.Servers), "tos_acknowledged", cfg.TOSAcknowledged)
+
 	// TODO: Initialize WebSocket Hub
 	// TODO: Initialize SessionManager with token and hub
 	// TODO: Start SessionManager background goroutines
 	// TODO: Start auto-connect for servers with connect_on_start=true (after TOS acknowledgment)
 
-	// Set up HTTP server with router
-	mux := http.NewServeMux()
-
-	// Health endpoint
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "text/plain")
-		w.WriteHeader(http.StatusOK)
-		w.Write([]byte("OK"))
-	})
-
-	// TODO: Wire API routes (/api/config, /api/servers/{id}/action, /api/acknowledge-tos)
-	// TODO: Wire WebSocket handler (/ws)
-	// TODO: Wire static file serving (/)
+	// Set up HTTP router
+	router := api.NewRouter(store, logger)
+	handler := router.Setup()
 
 	// Create server with timeouts
 	srv := &http.Server{
 		Addr:         ":" + port,
-		Handler:      mux,
+		Handler:      handler,
 		ReadTimeout:  15 * time.Second,
 		WriteTimeout: 15 * time.Second,
 		IdleTimeout:  60 * time.Second,
