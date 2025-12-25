@@ -43,7 +43,7 @@ cp .env.example .env
 # Edit .env with your Discord token
 
 # Run
-make run
+make start
 ```
 
 Open <http://localhost:8080> in your browser.
@@ -111,7 +111,7 @@ Set up UptimeRobot or similar to ping:
 GET http://your-server:8080/health
 ```
 
-Expected response: `200 OK` with body `OK`
+Returns `200 OK` with JSON containing status, uptime, connections, and runtime info.
 
 ## Development
 
@@ -123,7 +123,7 @@ make test
 make coverage
 
 # Format code
-make fmt
+make format
 
 # Run linter
 make lint
@@ -137,7 +137,10 @@ All `/api/*` endpoints (except auth) require authentication when `API_KEY` is se
 
 ```http
 GET /health
-Response: 200 OK, body: "OK"
+Response: 200 OK, JSON with status, uptime, connections, runtime, memory info
+
+HEAD /health
+Response: 200 OK (for simple uptime checks)
 ```
 
 ### Authentication
