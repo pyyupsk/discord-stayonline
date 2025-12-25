@@ -26,6 +26,8 @@ A self-hosted service that maintains Discord account presence by managing persis
 - Health endpoint for uptime monitoring
 - Single binary deployment with embedded assets
 - Docker support
+- API key authentication (optional)
+- Auto-fetch server/channel names from Discord
 
 ## Quick Start
 
@@ -62,8 +64,23 @@ docker run -d \
 | Variable          | Required | Default     | Description                                   |
 | ----------------- | -------- | ----------- | --------------------------------------------- |
 | `DISCORD_TOKEN`   | Yes      | -           | Your Discord user token                       |
+| `API_KEY`         | No       | -           | API key for web UI authentication             |
 | `PORT`            | No       | `8080`      | HTTP server port                              |
 | `ALLOWED_ORIGINS` | No       | `localhost` | Comma-separated allowed origins for WebSocket |
+
+### Authentication
+
+To protect the web UI with an API key:
+
+```bash
+# Generate a secure key
+openssl rand -hex 32
+
+# Add to .env
+API_KEY=your_generated_key_here
+```
+
+When `API_KEY` is set, users must enter the key to access the dashboard. The key is stored in an HTTP-only cookie (24h expiry).
 
 ## Getting Your Discord Token
 
@@ -103,11 +120,27 @@ make lint
 
 ## API Reference
 
+All `/api/*` endpoints (except auth) require authentication when `API_KEY` is set.
+
 ### Health Check
 
 ```http
 GET /health
 Response: 200 OK, body: "OK"
+```
+
+### Authentication
+
+```http
+GET /api/auth/check
+Response: {"authenticated": bool, "auth_required": bool}
+
+POST /api/auth/login
+Body: {"api_key": "..."}
+Response: 200 OK (sets HTTP-only cookie)
+
+POST /api/auth/logout
+Response: 200 OK (clears cookie)
 ```
 
 ### TOS Acknowledgment
@@ -122,13 +155,13 @@ Response: 200 OK
 
 ```http
 GET /api/config
-Response: {"servers": [...], "tos_acknowledged": bool}
+Response: {"servers": [...], "status": "online|idle|dnd", "tos_acknowledged": bool}
 
 POST /api/config
-Body: {"servers": [...]}  // Full replacement (max 15 entries)
+Body: {"servers": [...], "status": "..."}  // Full replacement (max 15 entries)
 
 PUT /api/config
-Body: {"servers": [...]}  // Partial update, merge by ID
+Body: {"servers": [...], "status": "..."}  // Partial update, merge by ID
 ```
 
 ### Server Actions
@@ -136,6 +169,17 @@ Body: {"servers": [...]}  // Partial update, merge by ID
 ```http
 POST /api/servers/{id}/action
 Body: {"action": "join" | "rejoin" | "exit"}
+```
+
+### Discord Info
+
+```http
+GET /api/discord/server-info?guild_id=...&channel_id=...
+Response: {"guild_id": "...", "guild_name": "...", "channel_id": "...", "channel_name": "..."}
+
+POST /api/discord/bulk-info
+Body: [{"guild_id": "...", "channel_id": "..."}, ...]
+Response: [{"guild_id": "...", "guild_name": "...", ...}, ...]
 ```
 
 ### WebSocket Status Updates

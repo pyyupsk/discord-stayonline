@@ -21,7 +21,9 @@ async function handleSubmit() {
   <div class="flex min-h-screen items-center justify-center p-4">
     <Card class="w-full max-w-md">
       <CardHeader class="text-center">
-        <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10">
+        <div
+          class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10"
+        >
           <KeyRound class="h-6 w-6 text-primary" />
         </div>
         <CardTitle class="text-xl">Discord Stay Online</CardTitle>
@@ -47,7 +49,11 @@ async function handleSubmit() {
             {{ error }}
           </p>
 
-          <Button type="submit" class="w-full" :disabled="loading || !apiKey.trim()">
+          <Button
+            type="submit"
+            class="w-full"
+            :disabled="loading || !apiKey.trim()"
+          >
             <LogIn class="mr-2 h-4 w-4" />
             {{ loading ? "Logging in..." : "Login" }}
           </Button>

@@ -38,7 +38,13 @@ const {
   addLog,
 } = useWebSocket();
 const { joinServer, rejoinServer, exitServer, isLoading } = useServers();
-const { authenticated, authRequired, checkAuth, logout, loading: authLoading } = useAuth();
+const {
+  authenticated,
+  authRequired,
+  checkAuth,
+  logout,
+  loading: authLoading,
+} = useAuth();
 
 const showServerForm = ref(false);
 const editingServer = ref<ServerEntry | null>(null);
@@ -166,7 +172,10 @@ async function handleExit(server: ServerEntry) {
 
 <template>
   <!-- Loading State -->
-  <div v-if="initialLoading" class="flex min-h-screen items-center justify-center">
+  <div
+    v-if="initialLoading"
+    class="flex min-h-screen items-center justify-center"
+  >
     <p class="text-muted-foreground">Loading...</p>
   </div>
 
@@ -190,7 +199,10 @@ async function handleExit(server: ServerEntry) {
         >
           <h1 class="text-xl font-semibold">Discord Stay Online</h1>
           <div class="flex items-center gap-3">
-            <Badge :variant="isConnected ? 'default' : 'secondary'" class="gap-1">
+            <Badge
+              :variant="isConnected ? 'default' : 'secondary'"
+              class="gap-1"
+            >
               <component :is="isConnected ? Wifi : WifiOff" class="h-3 w-3" />
               {{ isConnected ? "Connected" : "Disconnected" }}
             </Badge>
@@ -208,61 +220,61 @@ async function handleExit(server: ServerEntry) {
         </div>
       </header>
 
-    <!-- Main Content -->
-    <main class="container mx-auto space-y-6 px-4 py-6">
-      <!-- Global Status -->
-      <section class="flex items-center justify-between">
-        <GlobalStatus :status="config.status" @change="handleStatusChange" />
-      </section>
+      <!-- Main Content -->
+      <main class="container mx-auto space-y-6 px-4 py-6">
+        <!-- Global Status -->
+        <section class="flex items-center justify-between">
+          <GlobalStatus :status="config.status" @change="handleStatusChange" />
+        </section>
 
-      <Separator />
+        <Separator />
 
-      <!-- Server List -->
-      <section class="space-y-4">
-        <div class="flex items-center justify-between">
-          <h2 class="text-lg font-medium">Server Connections</h2>
-          <Button
-            size="sm"
-            @click="handleAddServer"
-            :disabled="config.servers.length >= 15"
+        <!-- Server List -->
+        <section class="space-y-4">
+          <div class="flex items-center justify-between">
+            <h2 class="text-lg font-medium">Server Connections</h2>
+            <Button
+              size="sm"
+              @click="handleAddServer"
+              :disabled="config.servers.length >= 15"
+            >
+              <Plus class="mr-1 h-4 w-4" />
+              Add Server
+            </Button>
+          </div>
+
+          <div
+            v-if="config.servers.length === 0"
+            class="rounded-lg border border-dashed p-8 text-center"
           >
-            <Plus class="mr-1 h-4 w-4" />
-            Add Server
-          </Button>
-        </div>
+            <p class="text-muted-foreground">
+              No servers configured. Click "Add Server" to get started.
+            </p>
+          </div>
 
-        <div
-          v-if="config.servers.length === 0"
-          class="rounded-lg border border-dashed p-8 text-center"
-        >
-          <p class="text-muted-foreground">
-            No servers configured. Click "Add Server" to get started.
-          </p>
-        </div>
+          <div v-else class="space-y-3">
+            <ServerCard
+              v-for="server in config.servers"
+              :key="server.id"
+              :server="server"
+              :status="getServerStatus(server.id)"
+              :loading="isLoading(server.id)"
+              @join="handleJoin(server)"
+              @rejoin="handleRejoin(server)"
+              @exit="handleExit(server)"
+              @edit="handleEditServer(server)"
+              @delete="handleDeleteServer(server)"
+            />
+          </div>
+        </section>
 
-        <div v-else class="space-y-3">
-          <ServerCard
-            v-for="server in config.servers"
-            :key="server.id"
-            :server="server"
-            :status="getServerStatus(server.id)"
-            :loading="isLoading(server.id)"
-            @join="handleJoin(server)"
-            @rejoin="handleRejoin(server)"
-            @exit="handleExit(server)"
-            @edit="handleEditServer(server)"
-            @delete="handleDeleteServer(server)"
-          />
-        </div>
-      </section>
+        <Separator />
 
-      <Separator />
-
-      <!-- Activity Log -->
-      <section>
-        <ActivityLog :logs="logs" @clear="clearLogs" />
-      </section>
-    </main>
+        <!-- Activity Log -->
+        <section>
+          <ActivityLog :logs="logs" @clear="clearLogs" />
+        </section>
+      </main>
     </div>
 
     <!-- Server Form Dialog -->
