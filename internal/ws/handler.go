@@ -42,7 +42,7 @@ func NewHandler(hub *Hub, allowedOrigins string, logger *slog.Logger) *Handler {
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Validate origin
 	origin := r.Header.Get("Origin")
-	if !h.isOriginAllowed(origin) {
+	if !h.isOriginAllowed(origin, r.Host) {
 		h.logger.Warn("Origin not allowed", "origin", origin)
 		http.Error(w, "Origin not allowed", http.StatusForbidden)
 		return
@@ -72,21 +72,37 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	client.ReadPump(ctx)
 }
 
-// isOriginAllowed checks if the origin is in the allowed list.
-func (h *Handler) isOriginAllowed(origin string) bool {
+// isOriginAllowed checks if the origin is in the allowed list or matches the host (same-origin).
+func (h *Handler) isOriginAllowed(origin, host string) bool {
 	if origin == "" {
 		return true // Allow requests without origin (non-browser clients)
 	}
 
-	// Remove protocol prefix
-	origin = strings.TrimPrefix(origin, "http://")
-	origin = strings.TrimPrefix(origin, "https://")
+	// Remove protocol prefix from origin
+	originHost := strings.TrimPrefix(origin, "http://")
+	originHost = strings.TrimPrefix(originHost, "https://")
 
-	// Remove port if present for comparison
-	if idx := strings.Index(origin, ":"); idx != -1 {
-		origin = origin[:idx]
+	// Allow same-origin requests (origin matches host)
+	if originHost == host {
+		return true
 	}
 
+	// Remove port if present for comparison
+	if idx := strings.Index(originHost, ":"); idx != -1 {
+		originHost = originHost[:idx]
+	}
+
+	// Also check host without port
+	hostWithoutPort := host
+	if idx := strings.Index(host, ":"); idx != -1 {
+		hostWithoutPort = host[:idx]
+	}
+
+	if originHost == hostWithoutPort {
+		return true
+	}
+
+	// Check against allowed origins list
 	for _, allowed := range h.allowedOrigins {
 		allowed = strings.TrimPrefix(allowed, "http://")
 		allowed = strings.TrimPrefix(allowed, "https://")
@@ -94,7 +110,7 @@ func (h *Handler) isOriginAllowed(origin string) bool {
 			allowed = allowed[:idx]
 		}
 
-		if origin == allowed {
+		if originHost == allowed {
 			return true
 		}
 	}
