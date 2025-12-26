@@ -9,6 +9,7 @@ import (
 
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
+	"github.com/pyyupsk/discord-stayonline/internal/ui"
 	"github.com/pyyupsk/discord-stayonline/internal/ws"
 )
 
@@ -95,9 +96,9 @@ func (r *Router) Setup() http.Handler {
 		r.mux.Handle("/ws", r.auth.ProtectHandler(http.HandlerFunc(wsHandler.ServeHTTP)))
 	}
 
-	// Static file handler (public - login page needs to load)
+	// Static file handler with SPA fallback (public - login page needs to load)
 	if r.webFS != nil {
-		r.mux.Handle("/", http.FileServer(http.FS(r.webFS)))
+		r.mux.Handle("/", ui.SPAHandler(r.webFS))
 	}
 
 	return r.mux

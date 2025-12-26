@@ -6,14 +6,45 @@ package ui
 import (
 	"io/fs"
 	"net/http"
+	"path"
+	"strings"
 )
 
-// StaticHandler returns an HTTP handler for serving static files from the given filesystem.
-func StaticHandler(fsys fs.FS) http.Handler {
-	return http.FileServer(http.FS(fsys))
-}
+// SPAHandler returns an HTTP handler for serving an SPA with fallback to index.html.
+// This ensures client-side routing works by serving index.html for any path that
+// doesn't match a static file.
+func SPAHandler(fsys fs.FS) http.Handler {
+	fileServer := http.FileServer(http.FS(fsys))
 
-// StaticHandlerWithPrefix returns a handler that strips a prefix and serves static files.
-func StaticHandlerWithPrefix(prefix string, fsys fs.FS) http.Handler {
-	return http.StripPrefix(prefix, http.FileServer(http.FS(fsys)))
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		urlPath := r.URL.Path
+
+		// Clean the path
+		if urlPath == "" || urlPath == "/" {
+			fileServer.ServeHTTP(w, r)
+			return
+		}
+
+		// Get the file path without leading slash
+		filePath := strings.TrimPrefix(urlPath, "/")
+
+		// Check if the path has a file extension (static asset)
+		ext := path.Ext(filePath)
+		if ext != "" {
+			// It's a static asset request - try to serve it
+			f, err := fsys.Open(filePath)
+			if err == nil {
+				_ = f.Close()
+				fileServer.ServeHTTP(w, r)
+				return
+			}
+			// Static asset not found - return 404
+			http.NotFound(w, r)
+			return
+		}
+
+		// No file extension - this is an SPA route, serve index.html
+		r.URL.Path = "/"
+		fileServer.ServeHTTP(w, r)
+	})
 }
