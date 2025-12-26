@@ -484,6 +484,17 @@ func (m *SessionManager) handleFatalError(session *Session, serverID string, err
 		return
 	}
 	m.logger.Error("Fatal Gateway error - stopping reconnection", "server_id", serverID, "error", err)
+
+	// Send webhook notification for permanent disconnection
+	if m.webhook != nil {
+		go m.webhook.NotifyDown(
+			serverID,
+			session.serverEntry.GuildID,
+			session.serverEntry.ChannelID,
+			err.Error(),
+		)
+	}
+
 	select {
 	case <-session.stopReconnect:
 	default:
@@ -529,21 +540,16 @@ func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.
 		m.logger.Info("Connection lost, will reconnect", "server_id", serverID)
 		client.Close()
 
-		// Send webhook notification for connection loss
-		if m.webhook != nil {
-			go m.webhook.NotifyDown(
-				serverID,
-				session.serverEntry.GuildID,
-				session.serverEntry.ChannelID,
-				"Connection lost unexpectedly",
-			)
-		}
-
 		// Brief delay before reconnect to avoid hammering Discord
 		session.state.MarkBackoff()
 		m.notifyStatusChange(serverID, StatusBackoff, "Reconnecting...")
 		delay := gateway.CalculateBackoff(session.state.BackoffAttempt)
 		m.logger.Info("Waiting before reconnect", "server_id", serverID, "delay", delay)
+
+		// Send webhook notification for reconnection attempt
+		if m.webhook != nil {
+			go m.webhook.NotifyReconnecting(serverID, session.state.BackoffAttempt, delay)
+		}
 
 		select {
 		case <-session.ctx.Done():

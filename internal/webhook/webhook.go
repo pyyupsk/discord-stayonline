@@ -78,7 +78,7 @@ func NewNotifier(webhookURL string, logger *slog.Logger) *Notifier {
 	}
 }
 
-// NotifyDown sends a notification when a server connection goes down.
+// NotifyDown sends a notification when a server connection is permanently down.
 func (n *Notifier) NotifyDown(serverID, guildID, channelID, reason string) {
 	if n == nil {
 		return
@@ -86,7 +86,7 @@ func (n *Notifier) NotifyDown(serverID, guildID, channelID, reason string) {
 
 	embed := Embed{
 		Title:       "🔴 Connection Lost",
-		Description: fmt.Sprintf("Connection to <#%s> has been lost and will attempt to reconnect.", channelID),
+		Description: fmt.Sprintf("Connection to <#%s> has been lost.", channelID),
 		Color:       ColorRed,
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		Fields: []Field{
