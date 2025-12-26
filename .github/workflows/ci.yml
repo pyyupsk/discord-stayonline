@@ -19,6 +19,15 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v6
 
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build web frontend
+        run: |
+          cd web
+          bun install --frozen-lockfile
+          bun run build
+
       - name: Set up Go
         uses: actions/setup-go@v6
         with:
@@ -45,6 +54,15 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v6
+
+      - name: Set up Bun
+        uses: oven-sh/setup-bun@v2
+
+      - name: Build web frontend
+        run: |
+          cd web
+          bun install --frozen-lockfile
+          bun run build
 
       - name: Set up Go
         uses: actions/setup-go@v6
