@@ -256,7 +256,7 @@ func TestGatewayClientConnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf("failed to connect to mock server: %v", err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, data, err := conn.Read(ctx)
@@ -304,7 +304,7 @@ func TestGatewayHeartbeat(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnect, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
@@ -370,7 +370,7 @@ func TestGatewayIdentify(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnect, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
@@ -446,7 +446,7 @@ func TestGatewayReconnect(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnect, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
@@ -490,7 +490,7 @@ func TestGatewayInvalidSession(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnect, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
@@ -578,7 +578,7 @@ func TestFullConnectionLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnect, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, err = conn.Read(ctx)
