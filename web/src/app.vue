@@ -1,18 +1,12 @@
 <script setup lang="ts">
-import { LogOut, Plus, Wifi, WifiOff } from "lucide-vue-next";
 import { computed, onMounted, ref, watch } from "vue";
 
-import type { ServerEntry, Status } from "@/types";
+import type { ConnectionStatus, ServerEntry, Status } from "@/types";
 
-import ActivityLog from "@/components/ActivityLog.vue";
-import GlobalStatus from "@/components/GlobalStatus.vue";
+import AppLayout from "@/components/layout/AppLayout.vue";
 import LoginForm from "@/components/LoginForm.vue";
-import ServerCard from "@/components/ServerCard.vue";
 import ServerForm from "@/components/ServerForm.vue";
 import TosModal from "@/components/TosModal.vue";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
 import { useAuth } from "@/composables/useAuth";
 import { useConfig } from "@/composables/useConfig";
 import { useServers } from "@/composables/useServers";
@@ -40,15 +34,23 @@ const {
   updateServerNamesFromConfig,
   wsStatus,
 } = useWebSocket();
-const { exitServer, isLoading, joinServer, rejoinServer } = useServers();
-const { authenticated, authRequired, checkAuth, loading: authLoading, logout } = useAuth();
+const { actionLoading, exitServer, joinServer, rejoinServer } = useServers();
+const { authenticated, authRequired, checkAuth, logout } = useAuth();
 
 const showServerForm = ref(false);
 const editingServer = ref<null | ServerEntry>(null);
 const initialLoading = ref(true);
 
-const isConnected = computed(() => wsStatus.value === "connected");
 const needsLogin = computed(() => authRequired.value && !authenticated.value);
+
+// Create a reactive map for server statuses
+const serverStatusMap = computed(() => {
+  const map = new Map<string, ConnectionStatus>();
+  config.value.servers.forEach((server) => {
+    map.set(server.id, getServerStatus(server.id));
+  });
+  return map;
+});
 
 onMounted(async () => {
   await checkAuth();
@@ -105,10 +107,10 @@ function handleAddServer() {
   showServerForm.value = true;
 }
 
-async function handleDeleteServer(server: ServerEntry) {
+async function handleDeleteServer(id: string) {
   if (!confirm("Are you sure you want to delete this server?")) return;
 
-  const success = await deleteServer(server.id);
+  const success = await deleteServer(id);
   if (success) {
     addLog("info", "Server deleted");
   }
@@ -119,26 +121,22 @@ function handleEditServer(server: ServerEntry) {
   showServerForm.value = true;
 }
 
-async function handleExit(server: ServerEntry) {
-  if (!confirm("Exit will close the connection. Continue?")) return;
-
-  const result = await exitServer(server.id);
+async function handleExit(id: string) {
+  const result = await exitServer(id);
   if (!result.success) {
     addLog("error", result.error || "Exit failed");
   }
 }
 
-async function handleJoin(server: ServerEntry) {
-  const result = await joinServer(server.id);
+async function handleJoin(id: string) {
+  const result = await joinServer(id);
   if (!result.success) {
     addLog("error", result.error || "Join failed");
   }
 }
 
-async function handleRejoin(server: ServerEntry) {
-  if (!confirm("Rejoin will close the current connection. Continue?")) return;
-
-  const result = await rejoinServer(server.id);
+async function handleRejoin(id: string) {
+  const result = await rejoinServer(id);
   if (!result.success) {
     addLog("error", result.error || "Rejoin failed");
   }
@@ -161,8 +159,8 @@ async function handleSaveServer(server: Omit<ServerEntry, "id"> & { id?: string 
   }
 }
 
-async function handleStatusChange(status: Status) {
-  const success = await updateStatus(status);
+async function handleStatusChange(status: string) {
+  const success = await updateStatus(status as Status);
   if (success) {
     addLog("info", `Status changed to ${status}`);
   }
@@ -171,7 +169,7 @@ async function handleStatusChange(status: Status) {
 
 <template>
   <!-- Loading State -->
-  <div v-if="initialLoading" class="flex min-h-screen items-center justify-center">
+  <div v-if="initialLoading" class="bg-background flex h-screen items-center justify-center">
     <div class="flex flex-col items-center gap-3">
       <div class="border-muted border-t-foreground h-8 w-8 animate-spin rounded-full border-2" />
       <p class="text-muted-foreground text-sm">Loading...</p>
@@ -186,116 +184,28 @@ async function handleStatusChange(status: Status) {
     <!-- TOS Modal -->
     <TosModal :open="!config.tos_acknowledged" @acknowledge="handleAcknowledgeTos" />
 
-    <!-- Main App -->
-    <div v-if="config.tos_acknowledged" class="bg-background min-h-screen">
-      <!-- Header -->
-      <header class="gradient-border bg-background/80 sticky top-0 z-50 backdrop-blur-sm">
-        <div class="container mx-auto flex items-center justify-between px-6 py-4">
-          <div class="flex items-center gap-3">
-            <div class="bg-foreground flex h-8 w-8 items-center justify-center rounded-lg">
-              <span class="text-background text-sm font-bold">DS</span>
-            </div>
-            <h1 class="text-lg font-semibold tracking-tight">Discord Stay Online</h1>
-          </div>
-          <div class="flex items-center gap-3">
-            <Badge
-              :variant="isConnected ? 'default' : 'secondary'"
-              :class="[isConnected ? 'status-glow' : '', 'transition-all duration-300']"
-            >
-              <component
-                :is="isConnected ? Wifi : WifiOff"
-                :class="[!isConnected && 'opacity-50']"
-              />
-              {{ isConnected ? "Connected" : "Disconnected" }}
-            </Badge>
-            <Button
-              v-if="authRequired"
-              variant="ghost"
-              size="icon"
-              class="press-effect"
-              :disabled="authLoading"
-              title="Logout"
-              @click="handleLogout"
-            >
-              <LogOut />
-            </Button>
-          </div>
-        </div>
-      </header>
-
-      <!-- Main Content -->
-      <main class="container mx-auto space-y-8 px-6 py-8">
-        <!-- Global Status -->
-        <section class="fade-in flex items-center justify-between">
-          <GlobalStatus :status="config.status" @change="handleStatusChange" />
-        </section>
-
-        <Separator class="opacity-50" />
-
-        <!-- Server List -->
-        <section class="fade-in space-y-4">
-          <div class="flex items-center justify-between">
-            <div>
-              <h2 class="text-base font-medium">Server Connections</h2>
-              <p class="text-muted-foreground text-sm">
-                {{ config.servers.length }} / 35 servers configured
-              </p>
-            </div>
-            <Button
-              size="sm"
-              class="press-effect"
-              :disabled="config.servers.length >= 35"
-              @click="handleAddServer"
-            >
-              <Plus />
-              Add Server
-            </Button>
-          </div>
-
-          <div
-            v-if="config.servers.length === 0"
-            class="border-muted-foreground/25 rounded-lg border border-dashed p-12 text-center"
-          >
-            <div
-              class="bg-muted mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full"
-            >
-              <Plus class="text-muted-foreground h-5 w-5" />
-            </div>
-            <p class="text-muted-foreground text-sm">
-              No servers configured. Click "Add Server" to get started.
-            </p>
-          </div>
-
-          <div v-else class="space-y-3">
-            <ServerCard
-              v-for="server in config.servers"
-              :key="server.id"
-              :server="server"
-              :status="getServerStatus(server.id)"
-              :loading="isLoading(server.id)"
-              class="fade-in"
-              @join="handleJoin(server)"
-              @rejoin="handleRejoin(server)"
-              @exit="handleExit(server)"
-              @edit="handleEditServer(server)"
-              @delete="handleDeleteServer(server)"
-            />
-          </div>
-        </section>
-
-        <Separator class="opacity-50" />
-
-        <!-- Activity Log -->
-        <section class="fade-in">
-          <ActivityLog
-            :logs="filteredLogs"
-            :filter="logFilter"
-            @clear="clearLogs"
-            @update:filter="setLogFilter"
-          />
-        </section>
-      </main>
-    </div>
+    <!-- Main App Layout -->
+    <AppLayout
+      v-if="config.tos_acknowledged"
+      :config="config"
+      :server-statuses="serverStatusMap"
+      :logs="filteredLogs"
+      :log-filter="logFilter"
+      :ws-status="wsStatus"
+      :action-loading="actionLoading"
+      @add-server="handleAddServer"
+      @edit-server="handleEditServer"
+      @delete-server="handleDeleteServer"
+      @join-server="handleJoin"
+      @rejoin-server="handleRejoin"
+      @exit-server="handleExit"
+      @update-status="handleStatusChange"
+      @clear-logs="clearLogs"
+      @update-log-filter="
+        (f: string) => setLogFilter(f as 'all' | 'info' | 'warn' | 'error' | 'debug')
+      "
+      @logout="handleLogout"
+    />
 
     <!-- Server Form Dialog -->
     <ServerForm v-model:open="showServerForm" :server="editingServer" @save="handleSaveServer" />

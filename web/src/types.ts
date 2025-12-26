@@ -21,6 +21,14 @@ export type LogEntry = {
   time: Date;
 };
 
+export type NavigationState = {
+  currentView: NavigationView;
+  selectedServerId: null | string;
+};
+
+// Navigation state for sidebar views
+export type NavigationView = "activity" | "dashboard" | "server";
+
 export type ServerEntry = {
   channel_id: string;
   channel_name?: string;
@@ -29,6 +37,23 @@ export type ServerEntry = {
   guild_name?: string;
   id: string;
   priority: number;
+};
+
+// Server groups for organization
+export type ServerGroup = {
+  collapsed: boolean;
+  id: string;
+  name: string;
+  serverIds: string[];
+};
+
+// Stats tracking
+export type Stats = {
+  connectionAttempts: number;
+  serverUptimes: Map<string, number>;
+  sessionStart: Date | null;
+  successfulConnections: number;
+  totalUptime: number;
 };
 
 export type Status = "dnd" | "idle" | "online";
