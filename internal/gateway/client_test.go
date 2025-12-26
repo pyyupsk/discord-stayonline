@@ -56,7 +56,7 @@ func newMockGatewayServer(t *testing.T) *mockGatewayServer {
 		mock.mu.Unlock()
 
 		if closeOnConnect {
-			conn.Close(closeCode, "test close")
+			_ = conn.Close(closeCode, "test close")
 			return
 		}
 
@@ -421,7 +421,7 @@ func TestHandleHello(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnectFmt, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	client := NewClient(testTokenClient, nil)
 	client.conn = conn
@@ -480,7 +480,7 @@ func TestConnectToMockServer(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnectFmt, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Verify we get HELLO
 	_, data, err := conn.Read(ctx)

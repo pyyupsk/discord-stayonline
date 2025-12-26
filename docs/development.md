@@ -3,7 +3,7 @@
 ## Prerequisites
 
 - Go 1.23+
-- Node.js 18+ with Bun
+- Node.js 22+ with Bun
 - Docker (optional)
 
 ## Commands
