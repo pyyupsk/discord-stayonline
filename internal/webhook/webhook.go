@@ -52,7 +52,7 @@ const (
 // Webhook identity.
 const (
 	WebhookUsername  = "Stay Online Monitor"
-	WebhookAvatarURL = "https://raw.githubusercontent.com/pyyupsk/discord-stayonline/main/web/public/favicon.svg"
+	WebhookAvatarURL = "https://raw.githubusercontent.com/pyyupsk/discord-stayonline/main/web/public/android-chrome-512x512.png"
 )
 
 // Field names.
