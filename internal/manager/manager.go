@@ -126,7 +126,7 @@ func (m *SessionManager) Stop() {
 		m.logger.Info("Stopping session", "server_id", id)
 		session.cancel()
 		if session.client != nil {
-			session.client.Close()
+			_ = session.client.Close()
 		}
 		if session.stopReconnect != nil {
 			close(session.stopReconnect)
@@ -217,7 +217,7 @@ func (m *SessionManager) Rejoin(serverID string) error {
 
 	// Close existing connection
 	if session.client != nil {
-		session.client.Close()
+		_ = session.client.Close()
 	}
 	session.cancel()
 
@@ -274,7 +274,7 @@ func (m *SessionManager) Exit(serverID string) error {
 
 	// Close connection
 	if session.client != nil {
-		session.client.Close()
+		_ = session.client.Close()
 	}
 	session.cancel()
 
@@ -529,16 +529,16 @@ func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.
 	disconnected := client.Disconnected()
 	select {
 	case <-session.ctx.Done():
-		client.Close()
+		_ = client.Close()
 		return true
 	case <-session.stopReconnect:
-		client.Close()
+		_ = client.Close()
 		return true
 	case <-disconnected:
 		// Connection ended, should reconnect
 		serverID := session.serverEntry.ID
 		m.logger.Info("Connection lost, will reconnect", "server_id", serverID)
-		client.Close()
+		_ = client.Close()
 
 		// Brief delay before reconnect to avoid hammering Discord
 		session.state.MarkBackoff()

@@ -35,7 +35,7 @@ func NewClient(conn *websocket.Conn, hub *Hub, logger *slog.Logger) *Client {
 func (c *Client) ReadPump(ctx context.Context) {
 	defer func() {
 		c.hub.unregister <- c
-		c.conn.Close(websocket.StatusGoingAway, "closing")
+		_ = c.conn.Close(websocket.StatusGoingAway, "closing")
 	}()
 
 	for {
@@ -68,7 +68,7 @@ func (c *Client) WritePump(ctx context.Context) {
 	ticker := time.NewTicker(30 * time.Second)
 	defer func() {
 		ticker.Stop()
-		c.conn.Close(websocket.StatusGoingAway, "closing")
+		_ = c.conn.Close(websocket.StatusGoingAway, "closing")
 	}()
 
 	for {
@@ -77,7 +77,7 @@ func (c *Client) WritePump(ctx context.Context) {
 			return
 		case message, ok := <-c.send:
 			if !ok {
-				c.conn.Close(websocket.StatusGoingAway, "hub closed")
+				_ = c.conn.Close(websocket.StatusGoingAway, "hub closed")
 				return
 			}
 

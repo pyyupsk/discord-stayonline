@@ -93,7 +93,7 @@ func (m *mockGatewayServer) URL() string {
 func (m *mockGatewayServer) Close() {
 	m.mu.Lock()
 	if m.conn != nil {
-		m.conn.Close(websocket.StatusNormalClosure, "server closing")
+		_ = m.conn.Close(websocket.StatusNormalClosure, "server closing")
 	}
 	m.mu.Unlock()
 	m.server.Close()

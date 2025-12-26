@@ -157,7 +157,7 @@ func shutdown(srv *http.Server, sessionMgr *manager.SessionManager, hub *ws.Hub,
 	hub.Close()
 
 	if dbStore != nil {
-		dbStore.Close()
+		_ = dbStore.Close()
 	}
 
 	if err := srv.Shutdown(ctx); err != nil {

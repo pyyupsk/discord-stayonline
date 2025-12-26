@@ -224,7 +224,7 @@ func (c *Client) Close() error {
 
 	// Close connection outside of lock to unblock read loop
 	if conn != nil {
-		conn.Close(websocket.StatusGoingAway, "client closing")
+		_ = conn.Close(websocket.StatusGoingAway, "client closing")
 	}
 
 	// Wait for read loop to finish with timeout
@@ -644,7 +644,7 @@ func (c *Client) handleInvalidSession(data json.RawMessage) {
 		// This will cause the read loop to exit and close the disconnected channel,
 		// which triggers the manager's reconnection logic with a fresh IDENTIFY.
 		if conn != nil {
-			conn.Close(websocket.StatusNormalClosure, "invalid session - will reconnect")
+			_ = conn.Close(websocket.StatusNormalClosure, "invalid session - will reconnect")
 		}
 		return
 	}
@@ -741,7 +741,7 @@ func (c *Client) startHeartbeat(ctx context.Context) {
 				conn := c.conn
 				c.mu.RUnlock()
 				if conn != nil {
-					conn.Close(websocket.StatusProtocolError, "missed heartbeat ACK")
+					_ = conn.Close(websocket.StatusProtocolError, "missed heartbeat ACK")
 				}
 				return
 			}

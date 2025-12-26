@@ -268,7 +268,7 @@ func (s *DBStore) Load() (*Configuration, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var srv ServerEntry
@@ -356,7 +356,7 @@ func (s *DBStore) getExistingServerIDs(tx *sql.Tx) (map[string]bool, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	for rows.Next() {
 		var id string
@@ -465,7 +465,7 @@ func (s *DBStore) GetLogs(level string) ([]LogEntry, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var logs []LogEntry
 	for rows.Next() {

@@ -166,7 +166,7 @@ func (n *Notifier) send(embed Embed) {
 		n.logger.Error("Failed to send webhook", "error", err)
 		return
 	}
-	defer resp.Body.Close()
+	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode >= 400 {
 		n.logger.Error("Webhook returned error", "status", resp.StatusCode)
