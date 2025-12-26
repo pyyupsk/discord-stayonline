@@ -9,6 +9,8 @@ import { useWebSocket } from "./useWebSocket";
 
 const initialized = ref(false);
 const initialLoading = ref(true);
+const showServerForm = ref(false);
+const editingServer = ref<null | ServerEntry>(null);
 
 export function useDashboard() {
   const {
@@ -37,9 +39,6 @@ export function useDashboard() {
 
   const { actionLoading, exitServer, joinServer, rejoinServer } = useServers();
   const { logout } = useAuth();
-
-  const showServerForm = ref(false);
-  const editingServer = ref<null | ServerEntry>(null);
 
   const serverStatusMap = computed(() => {
     const map = new Map<string, ConnectionStatus>();
