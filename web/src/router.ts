@@ -1,7 +1,7 @@
 import { createRouter, createWebHistory } from "vue-router";
 import { routes } from "vue-router/auto-routes";
 
-import { useAuth } from "@/composables/useAuth";
+import { useAuthStore } from "@/stores";
 
 export const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -13,16 +13,16 @@ export const router = createRouter({
 });
 
 router.beforeEach(async (to, _from, next) => {
-  const { authenticated, authRequired, checkAuth } = useAuth();
+  const authStore = useAuthStore();
 
-  if (!authenticated.value && !authRequired.value) {
-    await checkAuth();
+  if (!authStore.authenticated && !authStore.authRequired) {
+    await authStore.checkAuth();
   }
 
   const isLoginPage = to.path === "/login";
-  const needsAuth = authRequired.value && !authenticated.value;
+  const needsAuth = authStore.authRequired && !authStore.authenticated;
 
-  if (isLoginPage && authenticated.value) {
+  if (isLoginPage && authStore.authenticated) {
     next("/");
   } else if (!isLoginPage && needsAuth) {
     next("/login");
