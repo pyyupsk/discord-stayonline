@@ -16,7 +16,7 @@ export default defineConfig({
     pwa({
       includeAssets: ["favicon.ico", "fonts/**/*"],
       manifest: {
-        background_color: "#09090b",
+        background_color: "#000000",
         description: "Keep your Discord presence online",
         display: "standalone",
         icons: [
@@ -40,7 +40,7 @@ export default defineConfig({
         name: "Discord Stay Online",
         short_name: "Stay Online",
         start_url: "/",
-        theme_color: "#5865F2",
+        theme_color: "#5865f2",
       },
       registerType: "autoUpdate",
       workbox: {

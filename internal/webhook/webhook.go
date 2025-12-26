@@ -44,22 +44,20 @@ type WebhookPayload struct {
 
 // Colors for different notification types.
 const (
-	ColorRed    = 0xFF0000 // Error/Down
-	ColorGreen  = 0x00FF00 // Connected/Up
-	ColorYellow = 0xFFFF00 // Warning/Reconnecting
+	ColorRed    = 0xed4245 // Error/Down
+	ColorGreen  = 0x57f287 // Connected/Up
+	ColorYellow = 0xfee75c // Warning/Reconnecting
 )
 
 // Webhook identity.
 const (
-	WebhookUsername  = "Stay Online Monitor"
+	WebhookUsername  = "Discord Stay Online"
 	WebhookAvatarURL = "https://raw.githubusercontent.com/pyyupsk/discord-stayonline/main/web/public/android-chrome-512x512.png"
 )
 
 // Field names.
 const (
 	FieldServerID = "Server ID"
-	FieldGuild    = "Guild"
-	FieldChannel  = "Channel"
 )
 
 // NewNotifier creates a new webhook notifier.
@@ -81,20 +79,18 @@ func NewNotifier(webhookURL string, logger *slog.Logger) *Notifier {
 }
 
 // NotifyDown sends a notification when a server connection goes down.
-func (n *Notifier) NotifyDown(serverID, guildName, channelName, reason string) {
+func (n *Notifier) NotifyDown(serverID, guildID, channelID, reason string) {
 	if n == nil {
 		return
 	}
 
 	embed := Embed{
 		Title:       "🔴 Connection Lost",
-		Description: "Server connection has been lost and will attempt to reconnect.",
+		Description: fmt.Sprintf("Connection to <#%s> has been lost and will attempt to reconnect.", channelID),
 		Color:       ColorRed,
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		Fields: []Field{
 			{Name: FieldServerID, Value: serverID, Inline: true},
-			{Name: FieldGuild, Value: guildName, Inline: true},
-			{Name: FieldChannel, Value: channelName, Inline: true},
 			{Name: "Reason", Value: reason, Inline: false},
 		},
 	}
@@ -123,20 +119,18 @@ func (n *Notifier) NotifyReconnecting(serverID string, attempt int, delay time.D
 }
 
 // NotifyUp sends a notification when connection is restored.
-func (n *Notifier) NotifyUp(serverID, guildName, channelName string) {
+func (n *Notifier) NotifyUp(serverID, guildID, channelID string) {
 	if n == nil {
 		return
 	}
 
 	embed := Embed{
 		Title:       "🟢 Connection Restored",
-		Description: "Server connection has been successfully restored.",
+		Description: fmt.Sprintf("Connection to <#%s> has been successfully restored.", channelID),
 		Color:       ColorGreen,
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		Fields: []Field{
 			{Name: FieldServerID, Value: serverID, Inline: true},
-			{Name: FieldGuild, Value: guildName, Inline: true},
-			{Name: FieldChannel, Value: channelName, Inline: true},
 		},
 	}
 

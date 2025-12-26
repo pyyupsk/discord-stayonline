@@ -416,8 +416,8 @@ func (m *SessionManager) setupClientCallbacks(session *Session, client *gateway.
 		if wasReconnecting && m.webhook != nil {
 			go m.webhook.NotifyUp(
 				serverID,
-				session.serverEntry.GuildName,
-				session.serverEntry.ChannelName,
+				session.serverEntry.GuildID,
+				session.serverEntry.ChannelID,
 			)
 		}
 	}
@@ -533,8 +533,8 @@ func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.
 		if m.webhook != nil {
 			go m.webhook.NotifyDown(
 				serverID,
-				session.serverEntry.GuildName,
-				session.serverEntry.ChannelName,
+				session.serverEntry.GuildID,
+				session.serverEntry.ChannelID,
 				"Connection lost unexpectedly",
 			)
 		}

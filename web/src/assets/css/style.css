@@ -41,7 +41,7 @@
   }
 
   .terminal-log {
-    background: linear-gradient(180deg, #0a0a0a 0%, #000000 100%);
+    background: linear-gradient(180deg, #131416 0%, #000000 100%);
     font-family:
       "JetBrains Mono", "SF Mono", "Fira Code", "Fira Mono", Menlo, Monaco, Consolas, monospace;
   }
