@@ -562,7 +562,7 @@ func TestSendIdentifyWithConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnectFmt, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, _ = conn.Read(ctx)
@@ -603,7 +603,7 @@ func TestSendHeartbeatWithConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnectFmt, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, _ = conn.Read(ctx)
@@ -644,7 +644,7 @@ func TestSendPresenceUpdateWithConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnectFmt, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, _ = conn.Read(ctx)
@@ -669,7 +669,7 @@ func TestSendVoiceStateUpdateWithConnection(t *testing.T) {
 	if err != nil {
 		t.Fatalf(errFailedToConnectFmt, err)
 	}
-	defer conn.Close(websocket.StatusNormalClosure, "")
+	defer func() { _ = conn.Close(websocket.StatusNormalClosure, "") }()
 
 	// Read HELLO
 	_, _, _ = conn.Read(ctx)
