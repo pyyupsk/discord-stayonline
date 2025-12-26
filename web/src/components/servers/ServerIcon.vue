@@ -85,10 +85,10 @@ const isConnecting = computed(() => {
 
         <!-- Status Indicator -->
         <div
-          class="absolute -right-0.5 -bottom-0.5 h-4 w-4 rounded-full border-[3px] border-[#1e1f22]"
+          class="border-border absolute -right-0.5 -bottom-0.5 h-4 w-4 rounded-full border-[3px]"
           :class="statusColor"
         >
-          <Loader2 v-if="isConnecting" class="h-full w-full animate-spin p-0.5 text-[#1e1f22]" />
+          <Loader2 v-if="isConnecting" class="text-border h-full w-full animate-spin p-0.5" />
         </div>
       </button>
     </TooltipTrigger>

@@ -40,7 +40,9 @@ function getStatusLabel(status: Status): string {
 </script>
 
 <template>
-  <header class="border-border/50 bg-card flex h-14 items-center justify-between border-b px-6">
+  <header
+    class="border-border/50 bg-background flex h-14 items-center justify-between border-b px-6"
+  >
     <div class="flex items-center gap-4">
       <!-- App Title -->
       <h1 class="text-lg font-semibold tracking-tight">Discord Stay Online</h1>

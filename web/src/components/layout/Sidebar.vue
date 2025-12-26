@@ -62,7 +62,7 @@ const connectedCount = computed(() => {
 <template>
   <TooltipProvider :delay-duration="100">
     <aside
-      class="discord-sidebar border-border/50 flex h-full w-[72px] flex-col items-center border-r bg-[#1e1f22] py-3"
+      class="discord-sidebar border-border/50 bg-sidebar flex h-full w-[72px] flex-col items-center border-r py-3"
     >
       <!-- Dashboard Button -->
       <Tooltip>

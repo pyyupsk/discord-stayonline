@@ -1,6 +1,8 @@
 import tailwindcss from "@tailwindcss/vite";
 import vue from "@vitejs/plugin-vue";
 import path from "node:path";
+import unused from "unplugin-unused/vite";
+import router from "unplugin-vue-router/vite";
 import { defineConfig } from "vite";
 import { VitePWA as pwa } from "vite-plugin-pwa";
 
@@ -11,6 +13,7 @@ export default defineConfig({
     outDir: "dist",
   },
   plugins: [
+    router(),
     vue(),
     tailwindcss(),
     pwa({
@@ -45,6 +48,11 @@ export default defineConfig({
       registerType: "autoUpdate",
       workbox: {
         globPatterns: ["**/*.{js,css,html,ico,png,svg,woff2}"],
+      },
+    }),
+    unused({
+      ignore: {
+        dependencies: ["@tailwindcss/vite", "tailwindcss", "tw-animate-css"],
       },
     }),
   ],
