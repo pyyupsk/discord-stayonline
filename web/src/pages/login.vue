@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { KeyRound, LogIn } from "lucide-vue-next";
 import { ref } from "vue";
+import { useRouter } from "vue-router";
 
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,19 +9,24 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/composables/useAuth";
 
+const router = useRouter();
 const { error, loading, login } = useAuth();
 
 const apiKey = ref("");
 
 async function handleSubmit() {
   if (!apiKey.value.trim()) return;
-  await login(apiKey.value.trim());
+
+  const success = await login(apiKey.value.trim());
+  if (success) {
+    router.push("/");
+  }
 }
 </script>
 
 <template>
   <div class="flex min-h-screen items-center justify-center p-4">
-    <Card class="fade-in border-border/50 bg-card/50 w-full max-w-sm backdrop-blur-sm">
+    <Card class="fade-in border-border/50 bg-card/50 w-full max-w-md backdrop-blur-sm">
       <CardHeader class="space-y-4 text-center">
         <div class="bg-foreground mx-auto flex h-12 w-12 items-center justify-center rounded-lg">
           <KeyRound class="text-background h-5 w-5" />

@@ -30,6 +30,27 @@ declare module 'vue-router/auto-routes' {
       Record<never, never>,
       | never
     >,
+    '/activity': RouteRecordInfo<
+      '/activity',
+      '/activity',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/login': RouteRecordInfo<
+      '/login',
+      '/login',
+      Record<never, never>,
+      Record<never, never>,
+      | never
+    >,
+    '/servers/[id]': RouteRecordInfo<
+      '/servers/[id]',
+      '/servers/:id',
+      { id: ParamValue<true> },
+      { id: ParamValue<false> },
+      | never
+    >,
   }
 
   /**
@@ -46,6 +67,24 @@ declare module 'vue-router/auto-routes' {
     'src/pages/index.vue': {
       routes:
         | '/'
+      views:
+        | never
+    }
+    'src/pages/activity.vue': {
+      routes:
+        | '/activity'
+      views:
+        | never
+    }
+    'src/pages/login.vue': {
+      routes:
+        | '/login'
+      views:
+        | never
+    }
+    'src/pages/servers/[id].vue': {
+      routes:
+        | '/servers/[id]'
       views:
         | never
     }

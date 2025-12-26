@@ -1,40 +1,34 @@
-import { computed, ref } from "vue";
-
-import type { NavigationView } from "@/types";
-
-const currentView = ref<NavigationView>("dashboard");
-const selectedServerId = ref<null | string>(null);
+import { computed } from "vue";
+import { useRoute, useRouter } from "vue-router";
 
 export function useNavigation() {
-  const isDashboard = computed(() => currentView.value === "dashboard");
-  const isServerView = computed(() => currentView.value === "server");
-  const isActivityView = computed(() => currentView.value === "activity");
+  const route = useRoute();
+  const router = useRouter();
+
+  const isDashboard = computed(() => route.path === "/");
+  const isServerView = computed(() => route.path.startsWith("/servers/"));
+  const isActivityView = computed(() => route.path === "/activity");
+
+  const selectedServerId = computed(() => {
+    if (isServerView.value && "id" in route.params) {
+      return route.params.id as string;
+    }
+    return null;
+  });
 
   function navigateToDashboard() {
-    currentView.value = "dashboard";
-    selectedServerId.value = null;
+    router.push("/");
   }
 
   function navigateToServer(serverId: string) {
-    currentView.value = "server";
-    selectedServerId.value = serverId;
+    router.push(`/servers/${serverId}`);
   }
 
   function navigateToActivity() {
-    currentView.value = "activity";
-    selectedServerId.value = null;
-  }
-
-  function selectServer(serverId: null | string) {
-    if (serverId) {
-      navigateToServer(serverId);
-    } else {
-      navigateToDashboard();
-    }
+    router.push("/activity");
   }
 
   return {
-    currentView,
     isActivityView,
     isDashboard,
     isServerView,
@@ -42,6 +36,5 @@ export function useNavigation() {
     navigateToDashboard,
     navigateToServer,
     selectedServerId,
-    selectServer,
   };
 }
