@@ -19,10 +19,12 @@ export const useWebSocketStore = defineStore("websocket", () => {
   let onConfigChanged: ((_config: Configuration) => void) | null = null;
 
   const filteredLogs = computed(() => {
-    if (logFilter.value === "all") {
-      return logs.value;
-    }
-    return logs.value.filter((log) => log.level === logFilter.value);
+    const filtered =
+      logFilter.value === "all"
+        ? logs.value
+        : logs.value.filter((log) => log.level === logFilter.value);
+    // Return newest first
+    return [...filtered].reverse();
   });
 
   async function loadStatuses() {

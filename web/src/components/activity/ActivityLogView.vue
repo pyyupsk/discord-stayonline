@@ -114,7 +114,7 @@ function getLevelBadgeVariant(level: string) {
 </script>
 
 <template>
-  <div class="flex h-full flex-col space-y-4">
+  <div class="flex min-h-0 flex-1 flex-col space-y-4">
     <!-- Header -->
     <div class="flex items-center justify-between">
       <div>
@@ -162,7 +162,7 @@ function getLevelBadgeVariant(level: string) {
     </div>
 
     <!-- Log List -->
-    <ScrollArea class="border-border/50 bg-card flex-1 rounded-xl border">
+    <ScrollArea class="border-border/50 bg-card min-h-0 flex-1 rounded-xl border">
       <div class="divide-border/50 divide-y">
         <div
           v-for="(log, index) in filteredLogs"

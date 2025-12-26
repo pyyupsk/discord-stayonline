@@ -64,7 +64,7 @@ const {
         />
 
         <!-- Content Area -->
-        <div class="flex-1 overflow-y-auto p-6">
+        <div class="flex min-h-0 flex-1 flex-col p-6">
           <slot />
         </div>
       </main>
