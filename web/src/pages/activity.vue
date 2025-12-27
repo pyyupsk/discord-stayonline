@@ -1,13 +1,13 @@
 <script setup lang="ts">
 import ActivityLogView from "@/components/activity/ActivityLogView.vue";
-import DashboardLayout from "@/components/layout/DashboardLayout.vue";
+import AppLayout from "@/components/layout/AppLayout.vue";
 import { useDashboard } from "@/composables/useDashboard";
 
 const { clearLogs, config, filteredLogs, logFilter, setLogFilter } = useDashboard();
 </script>
 
 <template>
-  <DashboardLayout>
+  <AppLayout>
     <ActivityLogView
       :logs="filteredLogs"
       :filter="logFilter"
@@ -15,5 +15,5 @@ const { clearLogs, config, filteredLogs, logFilter, setLogFilter } = useDashboar
       @clear="clearLogs"
       @update:filter="(f) => setLogFilter(f as 'all' | 'info' | 'warn' | 'error' | 'debug')"
     />
-  </DashboardLayout>
+  </AppLayout>
 </template>

@@ -18,7 +18,7 @@ type Props = PrimitiveProps & {
 
 const props = withDefaults(defineProps<Props>(), {
   as: "button",
-  class: "",
+  class: undefined,
   size: "default",
   variant: "default",
 });

@@ -2,7 +2,7 @@
 import { computed } from "vue";
 import { useRoute, useRouter } from "vue-router";
 
-import DashboardLayout from "@/components/layout/DashboardLayout.vue";
+import AppLayout from "@/components/layout/AppLayout.vue";
 import ServerDetailView from "@/components/servers/ServerDetailView.vue";
 import { useDashboard } from "@/composables/useDashboard";
 
@@ -51,7 +51,7 @@ async function onDelete() {
 </script>
 
 <template>
-  <DashboardLayout>
+  <AppLayout>
     <ServerDetailView
       v-if="server"
       :server="server"
@@ -64,8 +64,8 @@ async function onDelete() {
       @rejoin="handleRejoin(serverId)"
       @exit="handleExit(serverId)"
     />
-    <div v-else class="flex h-full items-center justify-center">
+    <div v-else class="flex min-h-[50vh] items-center justify-center">
       <p class="text-muted-foreground">Server not found</p>
     </div>
-  </DashboardLayout>
+  </AppLayout>
 </template>

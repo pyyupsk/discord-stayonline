@@ -1,17 +1,17 @@
 <script setup lang="ts">
 import DashboardView from "@/components/dashboard/DashboardView.vue";
-import DashboardLayout from "@/components/layout/DashboardLayout.vue";
+import AppLayout from "@/components/layout/AppLayout.vue";
 import { useDashboard } from "@/composables/useDashboard";
 
 const { config, filteredLogs, serverStatusMap } = useDashboard();
 </script>
 
 <template>
-  <DashboardLayout>
+  <AppLayout>
     <DashboardView
       :servers="config.servers"
       :server-statuses="serverStatusMap"
       :logs="filteredLogs"
     />
-  </DashboardLayout>
+  </AppLayout>
 </template>
