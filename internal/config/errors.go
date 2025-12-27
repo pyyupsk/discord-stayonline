@@ -2,7 +2,6 @@ package config
 
 import "errors"
 
-// Configuration validation errors.
 var (
 	ErrEmptyID         = errors.New("server entry ID cannot be empty")
 	ErrEmptyGuildID    = errors.New("guild_id cannot be empty")

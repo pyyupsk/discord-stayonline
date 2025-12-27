@@ -1,4 +1,3 @@
-// Package manager provides session management for Discord Gateway connections.
 package manager
 
 import (
@@ -13,7 +12,6 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/webhook"
 )
 
-// Common errors
 var (
 	ErrServerNotFound     = errors.New("server not found")
 	ErrTooManyConnections = errors.New("maximum 35 connections allowed")
@@ -22,7 +20,6 @@ var (
 	ErrNotConnected       = errors.New("not connected")
 )
 
-// SessionStore interface for persisting Gateway session state.
 type SessionStore interface {
 	SaveSession(state config.SessionState) error
 	LoadSession(serverID string) (*config.SessionState, error)
@@ -30,7 +27,6 @@ type SessionStore interface {
 	UpdateSessionSequence(serverID string, sequence int) error
 }
 
-// SessionManager manages multiple Gateway connections.
 type SessionManager struct {
 	token        string
 	store        config.ConfigStore
@@ -41,14 +37,12 @@ type SessionManager struct {
 	sessions map[string]*Session
 	mu       sync.RWMutex
 
-	// Status callback for WebSocket hub broadcast
 	OnStatusChange func(serverID string, status ConnectionStatus, message string)
 
 	ctx    context.Context
 	cancel context.CancelFunc
 }
 
-// Session represents a single Gateway connection.
 type Session struct {
 	serverEntry config.ServerEntry
 	state       *SessionState
@@ -60,7 +54,6 @@ type Session struct {
 	stopReconnect chan struct{}
 }
 
-// NewSessionManager creates a new session manager.
 func NewSessionManager(token string, store config.ConfigStore, sessionStore SessionStore, webhookNotifier *webhook.Notifier, logger *slog.Logger) *SessionManager {
 	if logger == nil {
 		logger = slog.Default()
@@ -78,20 +71,17 @@ func NewSessionManager(token string, store config.ConfigStore, sessionStore Sess
 	}
 }
 
-// Start initializes the session manager and auto-connects configured servers.
 func (m *SessionManager) Start() error {
 	cfg, err := m.store.Load()
 	if err != nil {
 		return err
 	}
 
-	// Check TOS acknowledgment
 	if !cfg.TOSAcknowledged {
 		m.logger.Warn("TOS not acknowledged - skipping auto-connect")
 		return nil
 	}
 
-	// Collect servers to auto-connect
 	var toConnect []config.ServerEntry
 	for _, server := range cfg.Servers {
 		if server.ConnectOnStart {
@@ -99,8 +89,6 @@ func (m *SessionManager) Start() error {
 		}
 	}
 
-	// Auto-connect with session resumption (no stagger needed)
-	// Sessions are resumed from database, so no rate limit issues
 	if len(toConnect) > 0 {
 		go func() {
 			for _, s := range toConnect {
@@ -114,7 +102,6 @@ func (m *SessionManager) Start() error {
 	return nil
 }
 
-// Stop gracefully closes all connections.
 func (m *SessionManager) Stop() {
 	m.cancel()
 
@@ -130,7 +117,6 @@ func (m *SessionManager) Stop() {
 		if session.stopReconnect != nil {
 			select {
 			case <-session.stopReconnect:
-				// Already closed
 			default:
 				close(session.stopReconnect)
 			}
@@ -138,9 +124,7 @@ func (m *SessionManager) Stop() {
 	}
 }
 
-// Join starts a connection for a server entry.
 func (m *SessionManager) Join(serverID string) error {
-	// Check TOS acknowledgment first
 	cfg, err := m.store.Load()
 	if err != nil {
 		return err
@@ -149,7 +133,6 @@ func (m *SessionManager) Join(serverID string) error {
 		return ErrTOSNotAcknowledged
 	}
 
-	// Find server entry
 	var serverEntry *config.ServerEntry
 	for i := range cfg.Servers {
 		if cfg.Servers[i].ID == serverID {
@@ -164,7 +147,6 @@ func (m *SessionManager) Join(serverID string) error {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	// Check if already connected
 	if session, exists := m.sessions[serverID]; exists {
 		if session.state.ConnectionStatus == StatusConnected ||
 			session.state.ConnectionStatus == StatusConnecting {
@@ -172,7 +154,6 @@ func (m *SessionManager) Join(serverID string) error {
 		}
 	}
 
-	// Check connection limit
 	activeCount := 0
 	for _, s := range m.sessions {
 		if s.state.ConnectionStatus == StatusConnected ||
@@ -184,7 +165,6 @@ func (m *SessionManager) Join(serverID string) error {
 		return ErrTooManyConnections
 	}
 
-	// Create session
 	ctx, cancel := context.WithCancel(m.ctx)
 	session := &Session{
 		serverEntry:   *serverEntry,
@@ -196,56 +176,45 @@ func (m *SessionManager) Join(serverID string) error {
 
 	m.sessions[serverID] = session
 
-	// Start connection in goroutine
 	go m.runSession(session)
 
 	return nil
 }
 
-// Rejoin closes existing connection and reconnects.
 func (m *SessionManager) Rejoin(serverID string) error {
 	m.mu.Lock()
 	session, exists := m.sessions[serverID]
 	m.mu.Unlock()
 
 	if !exists {
-		// Delete any stale session data and join fresh
 		m.deleteSessionData(serverID)
 		return m.Join(serverID)
 	}
 
-	// Stop reconnection loop
 	if session.stopReconnect != nil {
 		select {
 		case <-session.stopReconnect:
-			// Already closed
 		default:
 			close(session.stopReconnect)
 		}
 	}
 
-	// Close existing connection
 	if session.client != nil {
 		_ = session.client.Close()
 	}
 	session.cancel()
 
-	// Remove old session from memory
 	m.mu.Lock()
 	delete(m.sessions, serverID)
 	m.mu.Unlock()
 
-	// Delete session data from database for fresh start
 	m.deleteSessionData(serverID)
 
-	// Wait a bit for cleanup
 	time.Sleep(100 * time.Millisecond)
 
-	// Start new connection with fresh IDENTIFY
 	return m.Join(serverID)
 }
 
-// deleteSessionData removes session data from the database.
 func (m *SessionManager) deleteSessionData(serverID string) {
 	if m.sessionStore == nil {
 		return
@@ -255,7 +224,6 @@ func (m *SessionManager) deleteSessionData(serverID string) {
 	}
 }
 
-// Exit closes a connection and stops reconnection.
 func (m *SessionManager) Exit(serverID string) error {
 	m.mu.Lock()
 	session, exists := m.sessions[serverID]
@@ -264,42 +232,34 @@ func (m *SessionManager) Exit(serverID string) error {
 		return ErrNotConnected
 	}
 
-	// Mark as disconnected first
 	session.state.MarkDisconnected()
 	m.mu.Unlock()
 
-	// Notify status change
 	m.notifyStatusChange(serverID, StatusDisconnected, "User requested exit")
 
-	// Stop reconnection
 	if session.stopReconnect != nil {
 		select {
 		case <-session.stopReconnect:
-			// Already closed
 		default:
 			close(session.stopReconnect)
 		}
 	}
 
-	// Close connection
 	if session.client != nil {
 		_ = session.client.Close()
 	}
 	session.cancel()
 
-	// Remove session from memory
 	m.mu.Lock()
 	delete(m.sessions, serverID)
 	m.mu.Unlock()
 
-	// Delete session data from database
 	m.deleteSessionData(serverID)
 
 	m.logger.Info("Session exited", "server_id", serverID)
 	return nil
 }
 
-// GetStatus returns the current status of a session.
 func (m *SessionManager) GetStatus(serverID string) (ConnectionStatus, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -311,7 +271,6 @@ func (m *SessionManager) GetStatus(serverID string) (ConnectionStatus, error) {
 	return session.state.ConnectionStatus, nil
 }
 
-// GetAllStatuses returns status for all sessions.
 func (m *SessionManager) GetAllStatuses() map[string]ConnectionStatus {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
@@ -323,7 +282,6 @@ func (m *SessionManager) GetAllStatuses() map[string]ConnectionStatus {
 	return statuses
 }
 
-// runSession runs a Gateway connection session.
 func (m *SessionManager) runSession(session *Session) {
 	serverID := session.serverEntry.ID
 	m.logger.Info("Starting session", "server_id", serverID)
@@ -356,7 +314,6 @@ func (m *SessionManager) runSession(session *Session) {
 	}
 }
 
-// shouldStopSession checks if the session should stop.
 func (m *SessionManager) shouldStopSession(session *Session) bool {
 	select {
 	case <-session.ctx.Done():
@@ -368,7 +325,6 @@ func (m *SessionManager) shouldStopSession(session *Session) bool {
 	}
 }
 
-// loadGlobalStatus loads the global status from config.
 func (m *SessionManager) loadGlobalStatus() string {
 	cfg, err := m.store.Load()
 	if err != nil {
@@ -382,7 +338,6 @@ func (m *SessionManager) loadGlobalStatus() string {
 	return status
 }
 
-// createAndConfigureClient creates a Gateway client and sets up callbacks.
 func (m *SessionManager) createAndConfigureClient(session *Session, status string) *gateway.Client {
 	serverID := session.serverEntry.ID
 	client := gateway.NewClient(m.token, m.logger)
@@ -395,7 +350,6 @@ func (m *SessionManager) createAndConfigureClient(session *Session, status strin
 	return client
 }
 
-// tryResumeSession attempts to load saved session data for resumption.
 func (m *SessionManager) tryResumeSession(client *gateway.Client, serverID string) {
 	if m.sessionStore == nil {
 		return
@@ -408,12 +362,10 @@ func (m *SessionManager) tryResumeSession(client *gateway.Client, serverID strin
 	m.logger.Info("Attempting session resume", "server_id", serverID, "session_id", savedSession.SessionID)
 }
 
-// setupClientCallbacks configures the Gateway client callbacks.
 func (m *SessionManager) setupClientCallbacks(session *Session, client *gateway.Client) {
 	serverID := session.serverEntry.ID
 
 	client.OnReady = func(sessionID string) {
-		// Check if this was a reconnection (backoff > 0 means we were reconnecting)
 		wasReconnecting := session.state.BackoffAttempt > 0
 
 		session.state.MarkConnected(sessionID)
@@ -421,7 +373,6 @@ func (m *SessionManager) setupClientCallbacks(session *Session, client *gateway.
 		m.saveSessionState(serverID, client)
 		m.joinVoiceChannel(session, client)
 
-		// Send webhook notification if this was a reconnection
 		if wasReconnecting && m.webhook != nil {
 			go m.webhook.NotifyUp(
 				serverID,
@@ -444,7 +395,6 @@ func (m *SessionManager) setupClientCallbacks(session *Session, client *gateway.
 	}
 }
 
-// saveSessionState persists the session state for future resumption.
 func (m *SessionManager) saveSessionState(serverID string, client *gateway.Client) {
 	if m.sessionStore == nil {
 		return
@@ -464,7 +414,6 @@ func (m *SessionManager) saveSessionState(serverID string, client *gateway.Clien
 	}
 }
 
-// joinVoiceChannel joins the configured voice channel.
 func (m *SessionManager) joinVoiceChannel(session *Session, client *gateway.Client) {
 	if session.serverEntry.ChannelID == "" {
 		return
@@ -474,7 +423,6 @@ func (m *SessionManager) joinVoiceChannel(session *Session, client *gateway.Clie
 	_ = client.SendVoiceStateUpdate(ctx, session.serverEntry.GuildID, session.serverEntry.ChannelID, true, true)
 }
 
-// handleInvalidSession handles invalid session errors by clearing stored session data.
 func (m *SessionManager) handleInvalidSession(serverID string, err error) {
 	if !errors.Is(err, gateway.ErrInvalidSession) {
 		return
@@ -487,14 +435,12 @@ func (m *SessionManager) handleInvalidSession(serverID string, err error) {
 	}
 }
 
-// handleFatalError handles fatal Gateway errors.
 func (m *SessionManager) handleFatalError(session *Session, serverID string, err error) {
 	if !errors.Is(err, gateway.ErrFatalClose) {
 		return
 	}
 	m.logger.Error("Fatal Gateway error - stopping reconnection", "server_id", serverID, "error", err)
 
-	// Send webhook notification for permanent disconnection
 	if m.webhook != nil {
 		go m.webhook.NotifyDown(
 			serverID,
@@ -511,7 +457,6 @@ func (m *SessionManager) handleFatalError(session *Session, serverID string, err
 	}
 }
 
-// handleConnectionError handles connection errors and returns true if should continue.
 func (m *SessionManager) handleConnectionError(session *Session, err error) bool {
 	serverID := session.serverEntry.ID
 	session.state.MarkError(err.Error())
@@ -533,7 +478,6 @@ func (m *SessionManager) handleConnectionError(session *Session, err error) bool
 	}
 }
 
-// waitForDisconnection waits for session end and returns true if should stop.
 func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.Client) bool {
 	disconnected := client.Disconnected()
 	select {
@@ -544,18 +488,15 @@ func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.
 		_ = client.Close()
 		return true
 	case <-disconnected:
-		// Connection ended, should reconnect
 		serverID := session.serverEntry.ID
 		m.logger.Info("Connection lost, will reconnect", "server_id", serverID)
 		_ = client.Close()
 
-		// Brief delay before reconnect to avoid hammering Discord
 		session.state.MarkBackoff()
 		m.notifyStatusChange(serverID, StatusBackoff, "Reconnecting...")
 		delay := gateway.CalculateBackoff(session.state.BackoffAttempt)
 		m.logger.Info("Waiting before reconnect", "server_id", serverID, "delay", delay)
 
-		// Send webhook notification for reconnection attempt
 		if m.webhook != nil {
 			go m.webhook.NotifyReconnecting(serverID, session.state.BackoffAttempt, delay)
 		}
@@ -571,7 +512,6 @@ func (m *SessionManager) waitForDisconnection(session *Session, client *gateway.
 	}
 }
 
-// notifyStatusChange calls the status change callback.
 func (m *SessionManager) notifyStatusChange(serverID string, status ConnectionStatus, message string) {
 	if m.OnStatusChange != nil {
 		m.OnStatusChange(serverID, status, message)

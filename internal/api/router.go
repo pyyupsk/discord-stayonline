@@ -1,4 +1,3 @@
-// Package api provides HTTP handlers for the Discord presence service REST API.
 package api
 
 import (
@@ -15,7 +14,6 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/ws"
 )
 
-// Router sets up HTTP routes for the API.
 type Router struct {
 	mux     *http.ServeMux
 	store   config.ConfigStore
@@ -26,8 +24,6 @@ type Router struct {
 	auth    *middleware.Auth
 }
 
-// NewRouter creates a new API router.
-// Returns an error if API_KEY environment variable is not set.
 func NewRouter(store config.ConfigStore, mgr *manager.SessionManager, hub *ws.Hub, webFS fs.FS, logger *slog.Logger) (*Router, error) {
 	if logger == nil {
 		logger = slog.Default()
@@ -48,37 +44,30 @@ func NewRouter(store config.ConfigStore, mgr *manager.SessionManager, hub *ws.Hu
 	}, nil
 }
 
-// Setup configures all HTTP routes.
 func (r *Router) Setup() http.Handler {
-	// Health endpoint (public)
 	healthHandler := handlers.NewHealthHandler(r.manager, r.hub)
 	r.mux.HandleFunc("GET /health", healthHandler.Health)
 	r.mux.HandleFunc("HEAD /health", healthHandler.Health)
 
-	// Auth endpoints (public)
 	authHandler := handlers.NewAuthHandler(r.auth, r.logger)
 	r.mux.HandleFunc("POST /api/auth/login", authHandler.Login)
 	r.mux.HandleFunc("POST /api/auth/logout", authHandler.Logout)
 	r.mux.HandleFunc("GET /api/auth/check", authHandler.Check)
 
-	// TOS acknowledgment (protected)
 	tosHandler := handlers.NewTOSHandler(r.store, r.logger)
 	r.mux.HandleFunc("POST /api/acknowledge-tos", r.auth.Protect(tosHandler.AcknowledgeTOS))
 
-	// Config handlers (protected)
 	configHandler := handlers.NewConfigHandler(r.store, r.logger)
 	r.mux.HandleFunc("GET /api/config", r.auth.Protect(configHandler.GetConfig))
 	r.mux.HandleFunc("POST /api/config", r.auth.Protect(configHandler.ReplaceConfig))
 	r.mux.HandleFunc("PUT /api/config", r.auth.Protect(configHandler.UpdateConfig))
 
-	// Server action handlers (protected)
 	if r.manager != nil {
 		serversHandler := handlers.NewServersHandler(r.manager, r.logger)
 		r.mux.HandleFunc("GET /api/statuses", r.auth.Protect(serversHandler.GetStatuses))
 		r.mux.HandleFunc("POST /api/servers/", r.auth.Protect(serversHandler.ExecuteAction))
 	}
 
-	// Discord info lookup handlers (protected)
 	discordHandler := handlers.NewDiscordHandler(r.logger)
 	r.mux.HandleFunc("GET /api/discord/user", r.auth.Protect(discordHandler.GetCurrentUser))
 	r.mux.HandleFunc("GET /api/discord/server-info", r.auth.Protect(discordHandler.GetServerInfo))
@@ -86,20 +75,17 @@ func (r *Router) Setup() http.Handler {
 	r.mux.HandleFunc("GET /api/discord/guilds", r.auth.Protect(discordHandler.GetUserGuilds))
 	r.mux.HandleFunc("GET /api/discord/guilds/", r.auth.Protect(discordHandler.GetGuildChannels))
 
-	// Logs handler (protected)
 	if r.hub != nil {
 		logsHandler := handlers.NewLogsHandler(r.hub, r.logger)
 		r.mux.HandleFunc("GET /api/logs", r.auth.Protect(logsHandler.GetLogs))
 	}
 
-	// WebSocket handler (protected via middleware wrapper)
 	if r.hub != nil {
 		allowedOrigins := os.Getenv("ALLOWED_ORIGINS")
 		wsHandler := ws.NewHandler(r.hub, allowedOrigins, r.logger)
 		r.mux.Handle("/ws", r.auth.ProtectHandler(http.HandlerFunc(wsHandler.ServeHTTP)))
 	}
 
-	// Static file handler with SPA fallback (public - login page needs to load)
 	if r.webFS != nil {
 		r.mux.Handle("/", ui.SPAHandler(r.webFS))
 	}
@@ -107,7 +93,6 @@ func (r *Router) Setup() http.Handler {
 	return r.mux
 }
 
-// Handler returns the HTTP handler.
 func (r *Router) Handler() http.Handler {
 	return r.mux
 }

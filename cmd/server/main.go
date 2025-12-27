@@ -1,4 +1,3 @@
-// Package main provides the entry point for the Discord Stay Online service.
 package main
 
 import (
@@ -172,7 +171,6 @@ func shutdown(srv *http.Server, sessionMgr *manager.SessionManager, hub *ws.Hub,
 	slog.Info("Server stopped")
 }
 
-// dbLogStore adapts store.Postgres to ws.LogStore interface.
 type dbLogStore struct {
 	db *store.Postgres
 }
@@ -187,7 +185,6 @@ func (s *dbLogStore) GetLogs(level string) ([]ws.LogEntry, error) {
 		return nil, err
 	}
 
-	// Convert store.LogEntry to ws.LogEntry
 	result := make([]ws.LogEntry, len(logs))
 	for i, log := range logs {
 		result[i] = ws.LogEntry{
@@ -199,7 +196,6 @@ func (s *dbLogStore) GetLogs(level string) ([]ws.LogEntry, error) {
 	return result, nil
 }
 
-// dbSessionStore adapts store.Postgres to manager.SessionStore interface.
 type dbSessionStore struct {
 	db *store.Postgres
 }

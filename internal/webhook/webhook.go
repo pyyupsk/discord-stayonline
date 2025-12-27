@@ -1,4 +1,3 @@
-// Package webhook provides Discord webhook notifications for server status changes.
 package webhook
 
 import (
@@ -11,14 +10,12 @@ import (
 	"time"
 )
 
-// Notifier sends Discord webhook notifications.
 type Notifier struct {
 	webhookURL string
 	client     *http.Client
 	logger     *slog.Logger
 }
 
-// Embed represents a Discord embed object.
 type Embed struct {
 	Title       string  `json:"title,omitempty"`
 	Description string  `json:"description,omitempty"`
@@ -27,14 +24,12 @@ type Embed struct {
 	Fields      []Field `json:"fields,omitempty"`
 }
 
-// Field represents a Discord embed field.
 type Field struct {
 	Name   string `json:"name"`
 	Value  string `json:"value"`
 	Inline bool   `json:"inline,omitempty"`
 }
 
-// WebhookPayload represents a Discord webhook message.
 type WebhookPayload struct {
 	Username  string  `json:"username,omitempty"`
 	AvatarURL string  `json:"avatar_url,omitempty"`
@@ -42,26 +37,19 @@ type WebhookPayload struct {
 	Embeds    []Embed `json:"embeds,omitempty"`
 }
 
-// Colors for different notification types.
 const (
-	ColorRed    = 0xed4245 // Error/Down
-	ColorGreen  = 0x57f287 // Connected/Up
-	ColorYellow = 0xfee75c // Warning/Reconnecting
+	ColorRed    = 0xed4245
+	ColorGreen  = 0x57f287
+	ColorYellow = 0xfee75c
 )
 
-// Webhook identity.
 const (
 	WebhookUsername  = "Discord Stay Online"
 	WebhookAvatarURL = "https://raw.githubusercontent.com/pyyupsk/discord-stayonline/main/web/public/android-chrome-512x512.png"
 )
 
-// Field names.
-const (
-	FieldServerID = "Server ID"
-)
+const FieldServerID = "Server ID"
 
-// NewNotifier creates a new webhook notifier.
-// Returns nil if webhookURL is empty.
 func NewNotifier(webhookURL string, logger *slog.Logger) *Notifier {
 	if webhookURL == "" {
 		return nil
@@ -78,7 +66,6 @@ func NewNotifier(webhookURL string, logger *slog.Logger) *Notifier {
 	}
 }
 
-// NotifyDown sends a notification when a server connection is permanently down.
 func (n *Notifier) NotifyDown(serverID, guildID, channelID, reason string) {
 	if n == nil {
 		return
@@ -98,7 +85,6 @@ func (n *Notifier) NotifyDown(serverID, guildID, channelID, reason string) {
 	n.send(embed)
 }
 
-// NotifyReconnecting sends a notification when reconnecting.
 func (n *Notifier) NotifyReconnecting(serverID string, attempt int, delay time.Duration) {
 	if n == nil {
 		return
@@ -118,7 +104,6 @@ func (n *Notifier) NotifyReconnecting(serverID string, attempt int, delay time.D
 	n.send(embed)
 }
 
-// NotifyUp sends a notification when connection is restored.
 func (n *Notifier) NotifyUp(serverID, guildID, channelID string) {
 	if n == nil {
 		return
@@ -137,7 +122,6 @@ func (n *Notifier) NotifyUp(serverID, guildID, channelID string) {
 	n.send(embed)
 }
 
-// send sends the webhook payload to Discord.
 func (n *Notifier) send(embed Embed) {
 	payload := WebhookPayload{
 		Username:  WebhookUsername,

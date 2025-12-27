@@ -13,35 +13,26 @@ import (
 	"github.com/coder/websocket"
 )
 
-// Gateway URL for Discord
 const (
 	GatewayURL     = "wss://gateway.discord.gg/?v=10&encoding=json"
 	GatewayVersion = 10
 )
 
-// Client properties rotation to avoid rate limits.
-// Discord rate-limits IDENTIFY requests per token, but different
-// client properties are treated as different "devices".
 var (
 	clientCounter uint64
 	osList        = []string{"Windows", "Linux", "Mac OS X", "iOS", "Android"}
 	browserList   = []string{"Discord Client", "Chrome", "Firefox", "Safari", "Edge", "Opera", "Brave"}
 )
 
-// getClientProperties returns unique OS/Browser/Device for each client.
-// With 5 OS × 7 browsers = 35 base combinations, plus unique device suffix
-// for unlimited unique client properties.
 func getClientProperties(index int) (os, browser, device string) {
 	os = osList[index%len(osList)]
 	browser = browserList[(index/len(osList))%len(browserList)]
-	// After 35 combinations, add device suffix to keep properties unique
 	if index >= len(osList)*len(browserList) {
 		device = fmt.Sprintf("device-%d", index)
 	}
 	return
 }
 
-// Client connection states
 const (
 	StateDisconnected = iota
 	StateConnecting
@@ -49,7 +40,6 @@ const (
 	StateClosed
 )
 
-// Common errors
 var (
 	ErrNotConnected   = errors.New("not connected to gateway")
 	ErrAlreadyClosed  = errors.New("connection already closed")
@@ -57,36 +47,31 @@ var (
 	ErrInvalidSession = errors.New("session is invalid")
 )
 
-// Client represents a Discord Gateway WebSocket client.
 type Client struct {
 	token       string
-	status      string // Presence status (online, idle, dnd)
-	clientIndex int    // Unique index for client properties rotation
+	status      string
+	clientIndex int
 
 	conn  *websocket.Conn
 	state int
 	mu    sync.RWMutex
 
-	// Session state for resumption
 	sessionID        string
 	sequence         int
 	resumeURL        string
-	resumeSessionID  string // Set before Connect to attempt resume
+	resumeSessionID  string
 	resumeSequence   int
 	resumeGatewayURL string
 
-	// Heartbeat management
 	heartbeatInterval time.Duration
 	heartbeatTicker   *time.Ticker
 	lastHeartbeatAck  time.Time
 	heartbeatStop     chan struct{}
 
-	// Message handling
 	readStop     chan struct{}
 	readDone     chan struct{}
-	disconnected chan struct{} // Closed when connection ends (for external listeners)
+	disconnected chan struct{}
 
-	// Status callbacks
 	OnReady       func(sessionID string)
 	OnDisconnect  func(code int, reason string)
 	OnError       func(err error)
@@ -95,30 +80,26 @@ type Client struct {
 	logger *slog.Logger
 }
 
-// NewClient creates a new Gateway client.
 func NewClient(token string, logger *slog.Logger) *Client {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	// Assign unique index for client properties rotation
 	index := int(atomic.AddUint64(&clientCounter, 1) - 1)
 	return &Client{
 		token:       token,
 		clientIndex: index,
-		status:      "online", // Default status
+		status:      "online",
 		state:       StateDisconnected,
 		logger:      logger.With("component", "gateway"),
 	}
 }
 
-// SetStatus sets the presence status to use when connecting.
 func (c *Client) SetStatus(status string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.status = status
 }
 
-// SetResumeData sets session data for attempting to resume on Connect.
 func (c *Client) SetResumeData(sessionID string, sequence int, resumeURL string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -127,14 +108,12 @@ func (c *Client) SetResumeData(sessionID string, sequence int, resumeURL string)
 	c.resumeGatewayURL = resumeURL
 }
 
-// GetSessionData returns current session data for persistence.
 func (c *Client) GetSessionData() (sessionID string, sequence int, resumeURL string) {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.sessionID, c.sequence, c.resumeURL
 }
 
-// ClearResumeData clears resume data (call after failed resume).
 func (c *Client) ClearResumeData() {
 	c.mu.Lock()
 	defer c.mu.Unlock()
@@ -143,8 +122,6 @@ func (c *Client) ClearResumeData() {
 	c.resumeGatewayURL = ""
 }
 
-// Connect establishes a connection to the Discord Gateway.
-// If resume data was set via SetResumeData, it will attempt to resume the session.
 func (c *Client) Connect(ctx context.Context) error {
 	c.mu.Lock()
 	if c.state == StateConnected {
@@ -157,7 +134,6 @@ func (c *Client) Connect(ctx context.Context) error {
 
 	c.notifyStateChange(StateConnecting)
 
-	// Use resume URL if available, otherwise use default gateway
 	gatewayURL := GatewayURL
 	if resumeURL != "" {
 		gatewayURL = resumeURL + "/?v=10&encoding=json"
@@ -174,7 +150,6 @@ func (c *Client) Connect(ctx context.Context) error {
 		return fmt.Errorf("dial gateway: %w", err)
 	}
 
-	// Set read limit to 1MB to handle large READY payloads
 	conn.SetReadLimit(1024 * 1024)
 
 	c.mu.Lock()
@@ -185,13 +160,11 @@ func (c *Client) Connect(ctx context.Context) error {
 	c.disconnected = make(chan struct{})
 	c.mu.Unlock()
 
-	// Start read loop
 	go c.readLoop(ctx)
 
 	return nil
 }
 
-// Close gracefully closes the Gateway connection.
 func (c *Client) Close() error {
 	c.mu.Lock()
 
@@ -202,41 +175,33 @@ func (c *Client) Close() error {
 
 	c.state = StateClosed
 
-	// Stop heartbeat (may already be closed by readLoop)
 	if c.heartbeatStop != nil {
 		close(c.heartbeatStop)
 		c.heartbeatStop = nil
 	}
 
-	// Stop read loop signal
 	if c.readStop != nil {
 		close(c.readStop)
 		c.readStop = nil
 	}
 
-	// Close WebSocket first to unblock any pending reads
 	conn := c.conn
 	c.conn = nil
 	readDone := c.readDone
-	// Don't set readDone to nil here - let readLoop's defer close it
 
 	c.mu.Unlock()
 
-	// Close connection outside of lock to unblock read loop
 	if conn != nil {
 		_ = conn.Close(websocket.StatusGoingAway, "client closing")
 	}
 
-	// Wait for read loop to finish with timeout
 	if readDone != nil {
 		select {
 		case <-readDone:
 		case <-time.After(5 * time.Second):
-			// Timeout waiting for read loop
 		}
 	}
 
-	// Clean up disconnected channel reference (readLoop's defer handles closing)
 	c.mu.Lock()
 	c.disconnected = nil
 	c.mu.Unlock()
@@ -245,7 +210,6 @@ func (c *Client) Close() error {
 	return nil
 }
 
-// SendIdentify sends the IDENTIFY payload to Discord.
 func (c *Client) SendIdentify(ctx context.Context) error {
 	c.mu.RLock()
 	status := c.status
@@ -256,7 +220,6 @@ func (c *Client) SendIdentify(ctx context.Context) error {
 	return c.SendIdentifyWithStatus(ctx, status)
 }
 
-// SendIdentifyWithStatus sends the IDENTIFY payload with a specific status.
 func (c *Client) SendIdentifyWithStatus(ctx context.Context, status string) error {
 	c.mu.RLock()
 	conn := c.conn
@@ -283,7 +246,7 @@ func (c *Client) SendIdentifyWithStatus(ctx context.Context, status string) erro
 			}(),
 			Presence: &PresenceData{
 				Status:     status,
-				Since:      new(int64), // 0 = not idle
+				Since:      new(int64),
 				Activities: []Activity{},
 				AFK:        false,
 			},
@@ -299,7 +262,6 @@ func (c *Client) SendIdentifyWithStatus(ctx context.Context, status string) erro
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
-// sendResume sends the RESUME payload to continue a previous session.
 func (c *Client) sendResume(ctx context.Context) error {
 	c.mu.RLock()
 	conn := c.conn
@@ -332,7 +294,6 @@ func (c *Client) sendResume(ctx context.Context) error {
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
-// SendHeartbeat sends a heartbeat to Discord.
 func (c *Client) SendHeartbeat(ctx context.Context) error {
 	c.mu.RLock()
 	conn := c.conn
@@ -350,7 +311,6 @@ func (c *Client) SendHeartbeat(ctx context.Context) error {
 		Op: OpHeartbeat,
 	}
 
-	// Send sequence if we have one
 	if seq > 0 {
 		heartbeat.Data = &seq
 	}
@@ -364,8 +324,6 @@ func (c *Client) SendHeartbeat(ctx context.Context) error {
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
-// SendPresenceUpdate sends a presence update to Discord.
-// MANUAL REVIEW: Verify status values are valid (online, idle, dnd, invisible).
 func (c *Client) SendPresenceUpdate(ctx context.Context, status string) error {
 	c.mu.RLock()
 	conn := c.conn
@@ -397,8 +355,6 @@ func (c *Client) SendPresenceUpdate(ctx context.Context, status string) error {
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
-// SendVoiceStateUpdate joins or leaves a voice channel.
-// MANUAL REVIEW: Verify guild_id and channel_id are valid Discord snowflakes.
 func (c *Client) SendVoiceStateUpdate(ctx context.Context, guildID, channelID string, selfMute, selfDeaf bool) error {
 	c.mu.RLock()
 	conn := c.conn
@@ -420,7 +376,6 @@ func (c *Client) SendVoiceStateUpdate(ctx context.Context, guildID, channelID st
 		},
 	}
 
-	// Set channel ID (nil to disconnect)
 	if channelID != "" {
 		voiceState.Data.ChannelID = &channelID
 	}
@@ -434,21 +389,17 @@ func (c *Client) SendVoiceStateUpdate(ctx context.Context, guildID, channelID st
 	return conn.Write(ctx, websocket.MessageText, data)
 }
 
-// readLoop continuously reads messages from the Gateway.
 func (c *Client) readLoop(ctx context.Context) {
 	defer func() {
 		c.mu.Lock()
-		// Close readDone to signal we're done (if not already nil from Close())
 		if c.readDone != nil {
 			close(c.readDone)
 			c.readDone = nil
 		}
-		// Stop heartbeat goroutine when read loop ends
 		if c.heartbeatStop != nil {
 			close(c.heartbeatStop)
 			c.heartbeatStop = nil
 		}
-		// Signal external listeners that connection ended
 		if c.disconnected != nil {
 			close(c.disconnected)
 			c.disconnected = nil
@@ -473,7 +424,6 @@ func (c *Client) readLoop(ctx context.Context) {
 			return
 		}
 
-		// Read with timeout
 		readCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
 		_, data, err := conn.Read(readCtx)
 		cancel()
@@ -489,14 +439,12 @@ func (c *Client) readLoop(ctx context.Context) {
 	}
 }
 
-// handleMessage processes an incoming Gateway message.
 func (c *Client) handleMessage(ctx context.Context, data []byte) error {
 	var msg GatewayMessage
 	if err := json.Unmarshal(data, &msg); err != nil {
 		return fmt.Errorf("unmarshal message: %w", err)
 	}
 
-	// Update sequence if present
 	if msg.Sequence != nil {
 		c.mu.Lock()
 		c.sequence = *msg.Sequence
@@ -534,7 +482,6 @@ func (c *Client) handleMessage(ctx context.Context, data []byte) error {
 	return nil
 }
 
-// handleHello processes the HELLO message and starts heartbeating.
 func (c *Client) handleHello(ctx context.Context, data json.RawMessage) error {
 	var hello HelloData
 	if err := json.Unmarshal(data, &hello); err != nil {
@@ -548,17 +495,14 @@ func (c *Client) handleHello(ctx context.Context, data json.RawMessage) error {
 
 	c.logger.Info("Received HELLO", "heartbeat_interval_ms", hello.HeartbeatInterval)
 
-	// Start heartbeat goroutine
 	go c.startHeartbeat(ctx)
 
-	// Send RESUME if we have session data, otherwise IDENTIFY
 	if resumeSessionID != "" {
 		return c.sendResume(ctx)
 	}
 	return c.SendIdentify(ctx)
 }
 
-// handleDispatch processes dispatch events.
 func (c *Client) handleDispatch(_ context.Context, eventType string, data json.RawMessage) error {
 	c.logger.Debug("Received dispatch event", "type", eventType)
 
@@ -584,10 +528,8 @@ func (c *Client) handleDispatch(_ context.Context, eventType string, data json.R
 
 	case "RESUMED":
 		c.mu.Lock()
-		// Copy resume data to active session
 		c.sessionID = c.resumeSessionID
 		c.sequence = c.resumeSequence
-		// Keep resumeURL from original session
 		c.state = StateConnected
 		sessionID := c.sessionID
 		c.mu.Unlock()
@@ -603,7 +545,6 @@ func (c *Client) handleDispatch(_ context.Context, eventType string, data json.R
 	return nil
 }
 
-// handleHeartbeatAck processes heartbeat acknowledgements.
 func (c *Client) handleHeartbeatAck() {
 	c.mu.Lock()
 	c.lastHeartbeatAck = time.Now()
@@ -611,22 +552,18 @@ func (c *Client) handleHeartbeatAck() {
 	c.logger.Debug("Received heartbeat ACK")
 }
 
-// handleReconnect handles a reconnect request from the Gateway.
 func (c *Client) handleReconnect() {
 	if c.OnDisconnect != nil {
 		c.OnDisconnect(0, "reconnect requested")
 	}
 }
 
-// handleInvalidSession handles an invalid session notification.
 func (c *Client) handleInvalidSession(data json.RawMessage) {
-	// Data is a boolean indicating if the session is resumable
 	var resumable bool
-	_ = json.Unmarshal(data, &resumable) // ignore error, default to false
+	_ = json.Unmarshal(data, &resumable)
 
 	if !resumable {
 		c.mu.Lock()
-		// Clear both active session and resume data
 		c.sessionID = ""
 		c.sequence = 0
 		c.resumeSessionID = ""
@@ -640,26 +577,20 @@ func (c *Client) handleInvalidSession(data json.RawMessage) {
 			c.OnError(ErrInvalidSession)
 		}
 
-		// Close the WebSocket connection to trigger a read error in readLoop.
-		// This will cause the read loop to exit and close the disconnected channel,
-		// which triggers the manager's reconnection logic with a fresh IDENTIFY.
 		if conn != nil {
 			_ = conn.Close(websocket.StatusNormalClosure, "invalid session - will reconnect")
 		}
 		return
 	}
 
-	// Resumable invalid session - just notify, connection will continue
 	if c.OnError != nil {
 		c.OnError(ErrInvalidSession)
 	}
 }
 
-// handleReadError processes read errors and determines if retryable.
 func (c *Client) handleReadError(err error) {
 	c.logger.Error("Read error", "error", err)
 
-	// Check for close status
 	closeStatus := websocket.CloseStatus(err)
 	if closeStatus != -1 {
 		c.logger.Info("Connection closed", "code", closeStatus)
@@ -682,7 +613,6 @@ func (c *Client) handleReadError(err error) {
 	c.setState(StateDisconnected)
 }
 
-// startHeartbeat runs the heartbeat loop.
 func (c *Client) startHeartbeat(ctx context.Context) {
 	c.mu.RLock()
 	interval := c.heartbeatInterval
@@ -693,7 +623,7 @@ func (c *Client) startHeartbeat(ctx context.Context) {
 		return
 	}
 
-	jitterDuration := randomJitter(interval * 2) // randomJitter returns 0-50%, so *2 gives 0-100%
+	jitterDuration := randomJitter(interval * 2)
 	c.logger.Debug("Waiting before first heartbeat", "jitter", jitterDuration)
 
 	select {
@@ -704,7 +634,6 @@ func (c *Client) startHeartbeat(ctx context.Context) {
 	case <-time.After(jitterDuration):
 	}
 
-	// Send initial heartbeat
 	if err := c.SendHeartbeat(ctx); err != nil {
 		c.logger.Error("Failed to send initial heartbeat", "error", err)
 		return
@@ -730,7 +659,6 @@ func (c *Client) startHeartbeat(ctx context.Context) {
 		case <-ctx.Done():
 			return
 		case <-c.heartbeatTicker.C:
-			// Check if we missed an ACK
 			c.mu.RLock()
 			lastAck := c.lastHeartbeatAck
 			c.mu.RUnlock()
@@ -754,43 +682,36 @@ func (c *Client) startHeartbeat(ctx context.Context) {
 	}
 }
 
-// setState updates the connection state.
 func (c *Client) setState(state int) {
 	c.mu.Lock()
 	c.state = state
 	c.mu.Unlock()
 }
 
-// notifyStateChange calls the state change callback.
 func (c *Client) notifyStateChange(state int) {
 	if c.OnStateChange != nil {
 		c.OnStateChange(state)
 	}
 }
 
-// State returns the current connection state.
 func (c *Client) State() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.state
 }
 
-// SessionID returns the current session ID.
 func (c *Client) SessionID() string {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.sessionID
 }
 
-// Sequence returns the current sequence number.
 func (c *Client) Sequence() int {
 	c.mu.RLock()
 	defer c.mu.RUnlock()
 	return c.sequence
 }
 
-// Disconnected returns a channel that is closed when the connection ends.
-// Use this to detect when reconnection is needed.
 func (c *Client) Disconnected() <-chan struct{} {
 	c.mu.RLock()
 	defer c.mu.RUnlock()

@@ -8,14 +8,12 @@ import (
 	"github.com/coder/websocket"
 )
 
-// Handler handles WebSocket upgrade requests.
 type Handler struct {
 	hub            *Hub
 	allowedOrigins []string
 	logger         *slog.Logger
 }
 
-// NewHandler creates a new WebSocket handler.
 func NewHandler(hub *Hub, allowedOrigins string, logger *slog.Logger) *Handler {
 	if logger == nil {
 		logger = slog.Default()
@@ -38,9 +36,7 @@ func NewHandler(hub *Hub, allowedOrigins string, logger *slog.Logger) *Handler {
 	}
 }
 
-// ServeHTTP handles WebSocket upgrade requests.
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	// Validate origin
 	origin := r.Header.Get("Origin")
 	if !h.isOriginAllowed(origin, r.Host) {
 		h.logger.Warn("Origin not allowed", "origin", origin)
@@ -48,7 +44,6 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Upgrade connection
 	conn, err := websocket.Accept(w, r, &websocket.AcceptOptions{
 		InsecureSkipVerify: false,
 		OriginPatterns:     h.allowedOrigins,
@@ -60,39 +55,31 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	h.logger.Info("WebSocket client connected", "remote_addr", r.RemoteAddr)
 
-	// Create client
 	client := NewClient(conn, h.hub, h.logger)
 	h.hub.Register(client)
 
-	// Create context for this connection
 	ctx := r.Context()
 
-	// Start read and write pumps
 	go client.WritePump(ctx)
 	client.ReadPump(ctx)
 }
 
-// isOriginAllowed checks if the origin is in the allowed list or matches the host (same-origin).
 func (h *Handler) isOriginAllowed(origin, host string) bool {
 	if origin == "" {
-		return true // Allow requests without origin (non-browser clients)
+		return true
 	}
 
-	// Remove protocol prefix from origin
 	originHost := strings.TrimPrefix(origin, "http://")
 	originHost = strings.TrimPrefix(originHost, "https://")
 
-	// Allow same-origin requests (origin matches host)
 	if originHost == host {
 		return true
 	}
 
-	// Remove port if present for comparison
 	if hostPart, _, found := strings.Cut(originHost, ":"); found {
 		originHost = hostPart
 	}
 
-	// Also check host without port
 	hostWithoutPort := host
 	if hostPart, _, found := strings.Cut(host, ":"); found {
 		hostWithoutPort = hostPart
@@ -102,7 +89,6 @@ func (h *Handler) isOriginAllowed(origin, host string) bool {
 		return true
 	}
 
-	// Check against allowed origins list
 	for _, allowed := range h.allowedOrigins {
 		allowed = strings.TrimPrefix(allowed, "http://")
 		allowed = strings.TrimPrefix(allowed, "https://")
@@ -118,17 +104,14 @@ func (h *Handler) isOriginAllowed(origin, host string) bool {
 	return false
 }
 
-// Upgrade is an alias for ServeHTTP to match common naming.
 func (h *Handler) Upgrade(w http.ResponseWriter, r *http.Request) {
 	h.ServeHTTP(w, r)
 }
 
-// Hub returns the underlying hub.
 func (h *Handler) Hub() *Hub {
 	return h.hub
 }
 
-// HandleWebSocket is a convenience function that upgrades and handles a WebSocket connection.
 func HandleWebSocket(hub *Hub, allowedOrigins string, logger *slog.Logger) http.HandlerFunc {
 	handler := NewHandler(hub, allowedOrigins, logger)
 	return handler.ServeHTTP
