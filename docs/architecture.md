@@ -40,18 +40,24 @@ Manages multiple Gateway sessions. Handles join/rejoin/exit operations, automati
 Configuration persistence layer with interface abstraction:
 
 - `interface.go` - `ConfigStore` interface
-- `config.go` - Configuration types
-- `store.go` - JSON file implementation
-- `db_store.go` - PostgreSQL implementation (also handles session state and logs)
+- `config.go` - Configuration types and `SessionState`
 - `errors.go` - Custom error types
+- `store/file.go` - JSON file implementation
+- `store/postgres.go` - PostgreSQL implementation (also handles session state and logs)
+- `store/models.go` - GORM database models
 
 ### WebSocket Hub (`internal/ws/hub.go`)
 
 WebSocket hub for broadcasting real-time status updates to connected frontend clients.
 
-### API Router (`internal/api/router.go`)
+### API Router (`internal/api/`)
 
-HTTP routing with auth middleware. Protected endpoints require API key when `API_KEY` env var is set.
+HTTP routing organized by function:
+
+- `router.go` - Route definitions
+- `handlers/` - HTTP request handlers
+- `middleware/` - Auth middleware (API_KEY is required)
+- `responses/` - JSON response helpers
 
 ## Session Resumption
 

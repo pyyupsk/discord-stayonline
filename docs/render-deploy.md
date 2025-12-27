@@ -38,8 +38,8 @@ This guide explains how to deploy Discord Stay Online to [Render](https://render
 | Variable          | Required | Description                                        |
 | ----------------- | -------- | -------------------------------------------------- |
 | `DISCORD_TOKEN`   | Yes      | Your Discord user token (mark as Secret)           |
+| `API_KEY`         | Yes      | API key for web UI authentication (mark as Secret) |
 | `DATABASE_URL`    | Yes\*    | PostgreSQL connection URL (see below)              |
-| `API_KEY`         | No       | API key for web UI authentication (mark as Secret) |
 | `PORT`            | No       | HTTP port (Render sets this automatically)         |
 | `ALLOWED_ORIGINS` | No       | Comma-separated allowed origins for WebSocket      |
 
@@ -59,11 +59,11 @@ Render's filesystem is ephemeral, so configuration is lost on restart. Use Postg
 
 The app auto-creates the required tables on startup.
 
-## Setting Up Authentication (Recommended)
+## Setting Up Authentication (Required)
 
-To protect the web UI:
+The web UI requires API key authentication:
 
-1. Generate a secure key: `openssl rand -hex 32`
+1. Generate a secure key: `echo "sk-live_$(openssl rand -base64 48 | tr -d '=+/')"`
 2. Add `API_KEY` environment variable with the generated key (mark as Secret)
 3. Users must enter this key to access the dashboard
 
@@ -102,7 +102,7 @@ After deployment:
 
 1. Wait for the service to start (shows "Live" in dashboard)
 2. Click the service URL (e.g., `https://discord-stayonline-xxxx.onrender.com`)
-3. If `API_KEY` is set, enter your API key to log in
+3. Enter your API key to log in
 4. Accept the TOS warning
 5. Configure your server connections
 

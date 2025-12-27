@@ -46,19 +46,19 @@ DATABASE_URL=postgres://user:password@host:5432/dbname
 
 The app auto-creates the required table on startup.
 
-### Authentication
+### Authentication (Required)
 
-To protect the web UI with an API key:
+The web UI requires API key authentication. The server will not start without it:
 
 ```bash
 # Generate a secure key
-openssl rand -hex 32
+echo "sk-live_$(openssl rand -base64 48 | tr -d '=+/')"
 
 # Add to .env
 API_KEY=your_generated_key_here
 ```
 
-When `API_KEY` is set, users must enter the key to access the dashboard. The key is stored in an HTTP-only cookie (24h expiry).
+Users must enter the API key to access the dashboard. The key is stored in an HTTP-only cookie (7-day expiry).
 
 ### Health Monitoring
 
