@@ -1,3 +1,5 @@
+import { defineConfig } from "eslint/config";
+
 import eslint from "@eslint/js";
 import perfectionist from "eslint-plugin-perfectionist";
 import prettier from "eslint-plugin-prettier/recommended";
@@ -5,10 +7,13 @@ import vue from "eslint-plugin-vue";
 import globals from "globals";
 import tseslint from "typescript-eslint";
 
-const eslintConfig = tseslint.config(
+const eslintConfig = defineConfig(
   eslint.configs.recommended,
   perfectionist.configs["recommended-natural"],
   tseslint.configs.recommended,
+  {
+    ignores: ["typed-router.d.ts"],
+  },
   {
     extends: [...vue.configs["flat/recommended"]],
     files: ["**/*.{ts,vue}"],
