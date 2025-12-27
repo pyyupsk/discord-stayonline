@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"strings"
 
+	"github.com/pyyupsk/discord-stayonline/internal/api/responses"
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
 )
 
@@ -27,77 +28,48 @@ func NewServersHandler(mgr *manager.SessionManager, logger *slog.Logger) *Server
 }
 
 // GetStatuses handles GET /api/statuses requests.
-// Returns current connection status for all sessions.
 func (h *ServersHandler) GetStatuses(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
 	statuses := h.manager.GetAllStatuses()
 
-	// Convert to map[string]string for JSON
 	result := make(map[string]string)
 	for id, status := range statuses {
 		result[id] = string(status)
 	}
 
-	writeJSON(w, http.StatusOK, result)
+	responses.JSON(w, http.StatusOK, result)
 }
 
 // ExecuteAction handles POST /api/servers/{id}/action requests.
 func (h *ServersHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
-		return
-	}
-
-	// Parse server ID from path
-	// Path format: /api/servers/{id}/action
 	path := strings.TrimPrefix(r.URL.Path, "/api/servers/")
 	parts := strings.Split(path, "/")
 	if len(parts) != 2 || parts[1] != "action" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error":   "invalid_path",
-			"message": "Invalid path format",
-		})
+		responses.Error(w, http.StatusBadRequest, "invalid_path", "Invalid path format")
 		return
 	}
 	serverID := parts[0]
 
 	if serverID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error":   "invalid_request",
-			"message": "Server ID is required",
-		})
+		responses.Error(w, http.StatusBadRequest, "invalid_request", "Server ID is required")
 		return
 	}
 
-	// Parse action from body
 	var req struct {
 		Action string `json:"action"`
 	}
 
-	limitBody(r)
+	responses.LimitBody(r)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode request", "error", err)
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error":   "invalid_request",
-			"message": "Invalid JSON request body",
-		})
+		responses.Error(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")
 		return
 	}
 
-	// Validate action
 	if req.Action != "join" && req.Action != "rejoin" && req.Action != "exit" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error":   "invalid_action",
-			"message": "Action must be 'join', 'rejoin', or 'exit'",
-		})
+		responses.Error(w, http.StatusBadRequest, "invalid_action", "Action must be 'join', 'rejoin', or 'exit'")
 		return
 	}
 
-	// Execute action
 	var err error
 	switch req.Action {
 	case "join":
@@ -132,18 +104,14 @@ func (h *ServersHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 			errorCode = "not_connected"
 		}
 
-		writeJSON(w, status, map[string]string{
-			"error":   errorCode,
-			"message": err.Error(),
-		})
+		responses.Error(w, status, errorCode, err.Error())
 		return
 	}
 
-	// Get new status
 	newStatus, _ := h.manager.GetStatus(serverID)
 
 	h.logger.Info("Action executed", "server_id", serverID, "action", req.Action, "new_status", newStatus)
-	writeJSON(w, http.StatusOK, map[string]any{
+	responses.JSON(w, http.StatusOK, map[string]any{
 		"success":    true,
 		"server_id":  serverID,
 		"action":     req.Action,

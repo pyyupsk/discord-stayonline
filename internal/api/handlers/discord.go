@@ -1,4 +1,4 @@
-package api
+package handlers
 
 import (
 	"encoding/json"
@@ -9,6 +9,8 @@ import (
 	"strings"
 	"sync"
 	"time"
+
+	"github.com/pyyupsk/discord-stayonline/internal/api/responses"
 )
 
 // DiscordHandler handles Discord API lookups.
@@ -57,6 +59,20 @@ type ServerInfo struct {
 	ChannelName string `json:"channel_name"`
 }
 
+// VoiceChannelInfo contains voice channel information.
+type VoiceChannelInfo struct {
+	ID       string `json:"id"`
+	Name     string `json:"name"`
+	Position int    `json:"position"`
+}
+
+const (
+	discordAPIBase        = "https://discord.com/api/v10"
+	cacheTTL              = 5 * time.Minute
+	channelTypeGuildVoice = 2
+	channelTypeGuildStage = 13
+)
+
 // NewDiscordHandler creates a new Discord API handler.
 func NewDiscordHandler(logger *slog.Logger) *DiscordHandler {
 	if logger == nil {
@@ -71,11 +87,6 @@ func NewDiscordHandler(logger *slog.Logger) *DiscordHandler {
 		logger: logger.With("handler", "discord"),
 	}
 }
-
-const (
-	discordAPIBase = "https://discord.com/api/v10"
-	cacheTTL       = 5 * time.Minute
-)
 
 func (h *DiscordHandler) getFromCache(key string) (any, bool) {
 	h.mu.RLock()
@@ -149,16 +160,13 @@ func (h *DiscordHandler) GetChannel(channelID string) (*ChannelInfo, error) {
 	return &channel, nil
 }
 
-// GetServerInfo handles GET /api/discord/server-info?guild_id=...&channel_id=...
+// GetServerInfo handles GET /api/discord/server-info
 func (h *DiscordHandler) GetServerInfo(w http.ResponseWriter, r *http.Request) {
 	guildID := r.URL.Query().Get("guild_id")
 	channelID := r.URL.Query().Get("channel_id")
 
 	if guildID == "" || channelID == "" {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error":   "invalid_request",
-			"message": "guild_id and channel_id are required",
-		})
+		responses.Error(w, http.StatusBadRequest, "invalid_request", "guild_id and channel_id are required")
 		return
 	}
 
@@ -167,106 +175,74 @@ func (h *DiscordHandler) GetServerInfo(w http.ResponseWriter, r *http.Request) {
 		ChannelID: channelID,
 	}
 
-	// Fetch guild info
-	guild, err := h.GetGuild(guildID)
-	if err != nil {
+	if guild, err := h.GetGuild(guildID); err != nil {
 		h.logger.Warn("Failed to fetch guild info", "guild_id", guildID, "error", err)
-		info.GuildName = ""
 	} else {
 		info.GuildName = guild.Name
 	}
 
-	// Fetch channel info
-	channel, err := h.GetChannel(channelID)
-	if err != nil {
+	if channel, err := h.GetChannel(channelID); err != nil {
 		h.logger.Warn("Failed to fetch channel info", "channel_id", channelID, "error", err)
-		info.ChannelName = ""
 	} else {
 		info.ChannelName = channel.Name
 	}
 
-	writeJSON(w, http.StatusOK, info)
+	responses.JSON(w, http.StatusOK, info)
 }
 
 // GetCurrentUser handles GET /api/discord/user
-// Returns the current authenticated user's Discord profile.
 func (h *DiscordHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	cacheKey := "user:me"
 	if cached, ok := h.getFromCache(cacheKey); ok {
-		writeJSON(w, http.StatusOK, cached)
+		responses.JSON(w, http.StatusOK, cached)
 		return
 	}
 
 	var user UserInfo
 	if err := h.fetchFromDiscord("/users/@me", &user); err != nil {
 		h.logger.Error("Failed to fetch current user", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error":   "discord_error",
-			"message": "Failed to fetch user from Discord",
-		})
+		responses.Error(w, http.StatusInternalServerError, "discord_error", "Failed to fetch user from Discord")
 		return
 	}
 
 	h.setCache(cacheKey, user)
-	writeJSON(w, http.StatusOK, user)
+	responses.JSON(w, http.StatusOK, user)
 }
 
 // GetUserGuilds handles GET /api/discord/guilds
-// Returns list of guilds the user is a member of.
 func (h *DiscordHandler) GetUserGuilds(w http.ResponseWriter, r *http.Request) {
 	cacheKey := "user:guilds"
 	if cached, ok := h.getFromCache(cacheKey); ok {
-		writeJSON(w, http.StatusOK, cached)
+		responses.JSON(w, http.StatusOK, cached)
 		return
 	}
 
 	var guilds []GuildInfo
 	if err := h.fetchFromDiscord("/users/@me/guilds", &guilds); err != nil {
 		h.logger.Error("Failed to fetch user guilds", "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error":   "discord_error",
-			"message": "Failed to fetch guilds from Discord",
-		})
+		responses.Error(w, http.StatusInternalServerError, "discord_error", "Failed to fetch guilds from Discord")
 		return
 	}
 
 	h.setCache(cacheKey, guilds)
-	writeJSON(w, http.StatusOK, guilds)
+	responses.JSON(w, http.StatusOK, guilds)
 }
-
-// VoiceChannelInfo contains voice channel information.
-type VoiceChannelInfo struct {
-	ID       string `json:"id"`
-	Name     string `json:"name"`
-	Position int    `json:"position"`
-}
-
-// Discord channel types
-const (
-	ChannelTypeGuildVoice = 2
-	ChannelTypeGuildStage = 13
-)
 
 // GetGuildChannels handles GET /api/discord/guilds/{id}/channels
-// Returns list of voice channels for the specified guild.
 func (h *DiscordHandler) GetGuildChannels(w http.ResponseWriter, r *http.Request) {
-	// Extract guild ID from path: /api/discord/guilds/{id}/channels
 	path := r.URL.Path
 	path = strings.TrimPrefix(path, "/api/discord/guilds/")
 	path = strings.TrimSuffix(path, "/channels")
 	guildID := path
 
 	if guildID == "" || strings.Contains(guildID, "/") {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error":   "invalid_request",
-			"message": "Guild ID is required",
-		})
+		responses.Error(w, http.StatusBadRequest, "invalid_request", "Guild ID is required")
 		return
 	}
 
 	cacheKey := "guild:channels:" + guildID
 	if cached, ok := h.getFromCache(cacheKey); ok {
-		writeJSON(w, http.StatusOK, cached)
+		responses.JSON(w, http.StatusOK, cached)
 		return
 	}
 
@@ -279,17 +255,13 @@ func (h *DiscordHandler) GetGuildChannels(w http.ResponseWriter, r *http.Request
 
 	if err := h.fetchFromDiscord("/guilds/"+guildID+"/channels", &channels); err != nil {
 		h.logger.Error("Failed to fetch guild channels", "guild_id", guildID, "error", err)
-		writeJSON(w, http.StatusInternalServerError, map[string]string{
-			"error":   "discord_error",
-			"message": "Failed to fetch channels from Discord",
-		})
+		responses.Error(w, http.StatusInternalServerError, "discord_error", "Failed to fetch channels from Discord")
 		return
 	}
 
-	// Filter for voice and stage channels only
 	var voiceChannels []VoiceChannelInfo
 	for _, ch := range channels {
-		if ch.Type == ChannelTypeGuildVoice || ch.Type == ChannelTypeGuildStage {
+		if ch.Type == channelTypeGuildVoice || ch.Type == channelTypeGuildStage {
 			voiceChannels = append(voiceChannels, VoiceChannelInfo{
 				ID:       ch.ID,
 				Name:     ch.Name,
@@ -299,51 +271,38 @@ func (h *DiscordHandler) GetGuildChannels(w http.ResponseWriter, r *http.Request
 	}
 
 	h.setCache(cacheKey, voiceChannels)
-	writeJSON(w, http.StatusOK, voiceChannels)
+	responses.JSON(w, http.StatusOK, voiceChannels)
 }
 
-// GetBulkServerInfo handles POST /api/discord/bulk-info with array of {guild_id, channel_id}
+// GetBulkServerInfo handles POST /api/discord/bulk-info
 func (h *DiscordHandler) GetBulkServerInfo(w http.ResponseWriter, r *http.Request) {
 	var requests []struct {
 		GuildID   string `json:"guild_id"`
 		ChannelID string `json:"channel_id"`
 	}
 
-	limitBody(r)
+	responses.LimitBody(r)
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
-		writeJSON(w, http.StatusBadRequest, map[string]string{
-			"error":   "invalid_request",
-			"message": "Invalid JSON request body",
-		})
+		responses.Error(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")
 		return
 	}
 
 	results := make([]ServerInfo, len(requests))
-
 	for i, req := range requests {
 		info := ServerInfo{
 			GuildID:   req.GuildID,
 			ChannelID: req.ChannelID,
 		}
 
-		// Fetch guild info
-		guild, err := h.GetGuild(req.GuildID)
-		if err != nil {
-			h.logger.Debug("Failed to fetch guild info", "guild_id", req.GuildID, "error", err)
-		} else {
+		if guild, err := h.GetGuild(req.GuildID); err == nil {
 			info.GuildName = guild.Name
 		}
-
-		// Fetch channel info
-		channel, err := h.GetChannel(req.ChannelID)
-		if err != nil {
-			h.logger.Debug("Failed to fetch channel info", "channel_id", req.ChannelID, "error", err)
-		} else {
+		if channel, err := h.GetChannel(req.ChannelID); err == nil {
 			info.ChannelName = channel.Name
 		}
 
 		results[i] = info
 	}
 
-	writeJSON(w, http.StatusOK, results)
+	responses.JSON(w, http.StatusOK, results)
 }
