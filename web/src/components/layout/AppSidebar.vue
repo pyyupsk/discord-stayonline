@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Activity, LayoutDashboard, Plus, Power, PowerOff, Server } from "lucide-vue-next";
+import { Activity, LayoutDashboard, Plus, Power, PowerOff } from "lucide-vue-next";
 import { computed } from "vue";
 
 import type { ConnectionStatus, ServerEntry } from "@/types";
@@ -96,10 +96,8 @@ function getStatusColor(status: ConnectionStatus) {
         <SidebarMenuItem>
           <SidebarMenuButton size="lg" as-child>
             <RouterLink to="/">
-              <div
-                class="bg-primary text-primary-foreground flex aspect-square size-8 items-center justify-center rounded-lg"
-              >
-                <Server class="size-4" />
+              <div class="flex size-8 shrink-0 items-center justify-center">
+                <img src="/favicon-32x32.png" alt="Discord Stay Online" class="size-6" />
               </div>
               <div class="grid flex-1 text-left text-sm leading-tight">
                 <span class="truncate font-semibold">Discord Stay Online</span>
@@ -150,9 +148,10 @@ function getStatusColor(status: ConnectionStatus) {
             <SidebarMenuItem v-for="server in servers" :key="server.id">
               <SidebarMenuButton
                 :is-active="selectedServerId === server.id"
+                :tooltip="server.guild_name || `Server ${server.guild_id.slice(-4)}`"
                 @click="navigateToServer(server.id)"
               >
-                <div class="relative">
+                <div class="relative shrink-0">
                   <img
                     :src="
                       server.guild_icon
@@ -160,10 +159,10 @@ function getStatusColor(status: ConnectionStatus) {
                         : `https://ui-avatars.com/api/?name=${(server.guild_name || server.guild_id).slice(0, 2).toUpperCase()}`
                     "
                     :alt="server.guild_name || 'Server'"
-                    class="size-5 rounded-full object-cover"
+                    class="size-4 rounded-full object-cover"
                   />
                   <span
-                    class="border-background absolute -right-0.5 -bottom-0.5 size-2 rounded-full border"
+                    class="border-background absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full border"
                     :class="getStatusColor(serverStatuses.get(server.id) || 'disconnected')"
                   />
                 </div>
