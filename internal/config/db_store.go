@@ -1,33 +1,28 @@
 package config
 
 import (
-	"database/sql"
 	"encoding/json"
 	"sync"
 	"time"
 
-	_ "github.com/lib/pq"
+	"gorm.io/driver/postgres"
+	"gorm.io/gorm"
+	"gorm.io/gorm/logger"
 )
 
-// DBStore handles configuration persistence using PostgreSQL with normalized tables.
-// Schema:
-//   - settings: global settings (status, tos_acknowledged)
-//   - servers: individual server entries for horizontal scaling
+// DBStore handles configuration persistence using PostgreSQL with GORM.
 type DBStore struct {
-	db *sql.DB
+	db *gorm.DB
 	mu sync.RWMutex
 }
 
 // NewDBStore creates a new database-backed configuration store.
 // It automatically creates the required tables if they don't exist.
 func NewDBStore(databaseURL string) (*DBStore, error) {
-	db, err := sql.Open("postgres", databaseURL)
+	db, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{
+		Logger: logger.Default.LogMode(logger.Silent),
+	})
 	if err != nil {
-		return nil, err
-	}
-
-	// Test connection
-	if err := db.Ping(); err != nil {
 		return nil, err
 	}
 
@@ -41,88 +36,37 @@ func NewDBStore(databaseURL string) (*DBStore, error) {
 	return store, nil
 }
 
-// migrate creates the tables if they don't exist and migrates from old schema.
+// migrate runs GORM auto-migration and handles schema evolution.
 func (s *DBStore) migrate() error {
-	// Create settings table (global config)
-	_, err := s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS settings (
-			id INTEGER PRIMARY KEY DEFAULT 1,
-			status VARCHAR(10) NOT NULL DEFAULT 'online',
-			tos_acknowledged BOOLEAN NOT NULL DEFAULT FALSE,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			CONSTRAINT single_settings_row CHECK (id = 1)
-		)
-	`)
-	if err != nil {
+	// Auto-migrate all models
+	if err := s.db.AutoMigrate(&Setting{}, &Server{}, &Log{}, &Session{}); err != nil {
 		return err
 	}
 
-	// Create servers table (individual entries for horizontal scaling)
-	_, err = s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS servers (
-			id VARCHAR(32) PRIMARY KEY,
-			guild_id VARCHAR(20) NOT NULL,
-			guild_name VARCHAR(100),
-			guild_icon VARCHAR(64),
-			channel_id VARCHAR(20) NOT NULL,
-			channel_name VARCHAR(100),
-			connect_on_start BOOLEAN NOT NULL DEFAULT FALSE,
-			priority INTEGER NOT NULL DEFAULT 1,
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		)
+	// Add CHECK constraint for single settings row (GORM doesn't support this directly)
+	s.db.Exec(`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint WHERE conname = 'single_settings_row'
+			) THEN
+				ALTER TABLE settings ADD CONSTRAINT single_settings_row CHECK (id = 1);
+			END IF;
+		END $$;
 	`)
-	if err != nil {
-		return err
-	}
 
-	// Create indexes for faster lookups and potential sharding
-	_, err = s.db.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_servers_guild_id ON servers(guild_id);
-		CREATE INDEX IF NOT EXISTS idx_servers_priority ON servers(priority);
+	// Add foreign key constraint for sessions (GORM doesn't auto-create this for non-embedded relations)
+	s.db.Exec(`
+		DO $$
+		BEGIN
+			IF NOT EXISTS (
+				SELECT 1 FROM pg_constraint WHERE conname = 'fk_sessions_server'
+			) THEN
+				ALTER TABLE sessions ADD CONSTRAINT fk_sessions_server
+				FOREIGN KEY (server_id) REFERENCES servers(id) ON DELETE CASCADE;
+			END IF;
+		END $$;
 	`)
-	if err != nil {
-		return err
-	}
-
-	// Add guild_icon column if it doesn't exist (migration for existing tables)
-	_, _ = s.db.Exec(`ALTER TABLE servers ADD COLUMN IF NOT EXISTS guild_icon VARCHAR(64)`)
-
-	// Create logs table
-	_, err = s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS logs (
-			id SERIAL PRIMARY KEY,
-			level VARCHAR(10) NOT NULL,
-			message TEXT NOT NULL,
-			created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		)
-	`)
-	if err != nil {
-		return err
-	}
-
-	// Create index for log filtering and cleanup
-	_, err = s.db.Exec(`
-		CREATE INDEX IF NOT EXISTS idx_logs_created_at ON logs(created_at);
-		CREATE INDEX IF NOT EXISTS idx_logs_level ON logs(level);
-	`)
-	if err != nil {
-		return err
-	}
-
-	// Create sessions table for Discord Gateway session resumption
-	_, err = s.db.Exec(`
-		CREATE TABLE IF NOT EXISTS sessions (
-			server_id VARCHAR(32) PRIMARY KEY REFERENCES servers(id) ON DELETE CASCADE,
-			session_id VARCHAR(64) NOT NULL,
-			sequence INTEGER NOT NULL DEFAULT 0,
-			resume_url VARCHAR(255) NOT NULL,
-			updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-		)
-	`)
-	if err != nil {
-		return err
-	}
 
 	// Migrate from old schema if exists
 	if err := s.migrateFromOldSchema(); err != nil {
@@ -130,13 +74,17 @@ func (s *DBStore) migrate() error {
 	}
 
 	// Ensure settings row exists
-	_, err = s.db.Exec(`
-		INSERT INTO settings (id, status, tos_acknowledged)
-		VALUES (1, 'online', FALSE)
-		ON CONFLICT (id) DO NOTHING
-	`)
+	var count int64
+	s.db.Model(&Setting{}).Count(&count)
+	if count == 0 {
+		s.db.Create(&Setting{
+			ID:              1,
+			Status:          "online",
+			TOSAcknowledged: false,
+		})
+	}
 
-	return err
+	return nil
 }
 
 // oldConfigData represents the old JSONB configuration structure.
@@ -175,19 +123,20 @@ func (s *DBStore) migrateFromOldSchema() error {
 // shouldSkipMigration checks if migration should be skipped.
 func (s *DBStore) shouldSkipMigration() bool {
 	var exists bool
-	err := s.db.QueryRow(`
+	s.db.Raw(`
 		SELECT EXISTS (
 			SELECT FROM information_schema.tables
 			WHERE table_name = 'configuration'
 		)
 	`).Scan(&exists)
-	if err != nil || !exists {
+
+	if !exists {
 		return true
 	}
 
-	var settingsCount, serversCount int
-	_ = s.db.QueryRow(`SELECT COUNT(*) FROM settings`).Scan(&settingsCount)
-	_ = s.db.QueryRow(`SELECT COUNT(*) FROM servers`).Scan(&serversCount)
+	var settingsCount, serversCount int64
+	s.db.Model(&Setting{}).Count(&settingsCount)
+	s.db.Model(&Server{}).Count(&serversCount)
 
 	return settingsCount > 0 || serversCount > 0
 }
@@ -195,8 +144,8 @@ func (s *DBStore) shouldSkipMigration() bool {
 // loadOldConfig loads and parses the old configuration.
 func (s *DBStore) loadOldConfig() (*oldConfigData, bool) {
 	var data []byte
-	err := s.db.QueryRow("SELECT data FROM configuration WHERE id = 1").Scan(&data)
-	if err != nil {
+	result := s.db.Raw("SELECT data FROM configuration WHERE id = 1").Scan(&data)
+	if result.Error != nil || len(data) == 0 {
 		return nil, false
 	}
 
@@ -214,26 +163,28 @@ func (s *DBStore) migrateSettings(oldConfig *oldConfigData) error {
 	if status == "" {
 		status = "online"
 	}
-	_, err := s.db.Exec(`
-		INSERT INTO settings (id, status, tos_acknowledged)
-		VALUES (1, $1, $2)
-		ON CONFLICT (id) DO UPDATE SET
-			status = EXCLUDED.status,
-			tos_acknowledged = EXCLUDED.tos_acknowledged
-	`, status, oldConfig.TOSAcknowledged)
-	return err
+	return s.db.Save(&Setting{
+		ID:              1,
+		Status:          status,
+		TOSAcknowledged: oldConfig.TOSAcknowledged,
+	}).Error
 }
 
 // migrateServers migrates servers from old config.
 func (s *DBStore) migrateServers(oldConfig *oldConfigData) error {
 	for _, srv := range oldConfig.Servers {
 		priority := max(srv.Priority, 1)
-		_, err := s.db.Exec(`
-			INSERT INTO servers (id, guild_id, guild_name, channel_id, channel_name, connect_on_start, priority)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)
-			ON CONFLICT (id) DO NOTHING
-		`, srv.ID, srv.GuildID, srv.GuildName, srv.ChannelID, srv.ChannelName, srv.ConnectOnStart, priority)
-		if err != nil {
+		server := Server{
+			ID:             srv.ID,
+			GuildID:        srv.GuildID,
+			GuildName:      stringToPtr(srv.GuildName),
+			ChannelID:      srv.ChannelID,
+			ChannelName:    stringToPtr(srv.ChannelName),
+			ConnectOnStart: srv.ConnectOnStart,
+			Priority:       priority,
+		}
+		// Use FirstOrCreate to avoid overwriting existing data
+		if err := s.db.FirstOrCreate(&server, Server{ID: srv.ID}).Error; err != nil {
 			return err
 		}
 	}
@@ -252,38 +203,51 @@ func (s *DBStore) Load() (*Configuration, error) {
 	}
 
 	// Load settings
-	var status string
-	err := s.db.QueryRow(`
-		SELECT status, tos_acknowledged FROM settings WHERE id = 1
-	`).Scan(&status, &cfg.TOSAcknowledged)
-	if err != nil && err != sql.ErrNoRows {
+	var setting Setting
+	if err := s.db.First(&setting).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return nil, err
 	}
-	if status != "" {
-		cfg.Status = Status(status)
+	if setting.Status != "" {
+		cfg.Status = Status(setting.Status)
 	}
+	cfg.TOSAcknowledged = setting.TOSAcknowledged
 
 	// Load servers ordered by priority
-	rows, err := s.db.Query(`
-		SELECT id, guild_id, COALESCE(guild_name, ''), COALESCE(guild_icon, ''), channel_id, COALESCE(channel_name, ''), connect_on_start, priority
-		FROM servers
-		ORDER BY priority ASC, created_at ASC
-	`)
-	if err != nil {
+	var servers []Server
+	if err := s.db.Order("priority ASC, created_at ASC").Find(&servers).Error; err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 
-	for rows.Next() {
-		var srv ServerEntry
-		err := rows.Scan(&srv.ID, &srv.GuildID, &srv.GuildName, &srv.GuildIcon, &srv.ChannelID, &srv.ChannelName, &srv.ConnectOnStart, &srv.Priority)
-		if err != nil {
-			return nil, err
-		}
-		cfg.Servers = append(cfg.Servers, srv)
+	for _, srv := range servers {
+		cfg.Servers = append(cfg.Servers, ServerEntry{
+			ID:             srv.ID,
+			GuildID:        srv.GuildID,
+			GuildName:      ptrToString(srv.GuildName),
+			GuildIcon:      ptrToString(srv.GuildIcon),
+			ChannelID:      srv.ChannelID,
+			ChannelName:    ptrToString(srv.ChannelName),
+			ConnectOnStart: srv.ConnectOnStart,
+			Priority:       srv.Priority,
+		})
 	}
 
-	return cfg, rows.Err()
+	return cfg, nil
+}
+
+// ptrToString safely converts *string to string.
+func ptrToString(s *string) string {
+	if s == nil {
+		return ""
+	}
+	return *s
+}
+
+// stringToPtr converts non-empty string to *string.
+func stringToPtr(s string) *string {
+	if s == "" {
+		return nil
+	}
+	return &s
 }
 
 // Save writes the configuration to the database.
@@ -296,123 +260,78 @@ func (s *DBStore) Save(cfg *Configuration) error {
 		return err
 	}
 
-	tx, err := s.db.Begin()
-	if err != nil {
-		return err
-	}
-	defer func() {
-		if err != nil {
-			_ = tx.Rollback()
+	return s.db.Transaction(func(tx *gorm.DB) error {
+		// Save settings
+		status := string(cfg.Status)
+		if status == "" {
+			status = "online"
 		}
-	}()
+		if err := tx.Save(&Setting{
+			ID:              1,
+			Status:          status,
+			TOSAcknowledged: cfg.TOSAcknowledged,
+		}).Error; err != nil {
+			return err
+		}
 
-	if err = s.saveSettings(tx, cfg); err != nil {
-		return err
-	}
-
-	if err = s.syncServers(tx, cfg.Servers); err != nil {
-		return err
-	}
-
-	return tx.Commit()
-}
-
-// saveSettings saves global settings to the database.
-func (s *DBStore) saveSettings(tx *sql.Tx, cfg *Configuration) error {
-	status := string(cfg.Status)
-	if status == "" {
-		status = "online"
-	}
-	_, err := tx.Exec(`
-		INSERT INTO settings (id, status, tos_acknowledged, updated_at)
-		VALUES (1, $1, $2, NOW())
-		ON CONFLICT (id) DO UPDATE SET
-			status = EXCLUDED.status,
-			tos_acknowledged = EXCLUDED.tos_acknowledged,
-			updated_at = NOW()
-	`, status, cfg.TOSAcknowledged)
-	return err
+		// Sync servers
+		return s.syncServers(tx, cfg.Servers)
+	})
 }
 
 // syncServers synchronizes servers in the database with the provided list.
-func (s *DBStore) syncServers(tx *sql.Tx, servers []ServerEntry) error {
-	existingIDs, err := s.getExistingServerIDs(tx)
-	if err != nil {
+func (s *DBStore) syncServers(tx *gorm.DB, servers []ServerEntry) error {
+	// Get existing server IDs
+	var existingIDs []string
+	if err := tx.Model(&Server{}).Pluck("id", &existingIDs).Error; err != nil {
 		return err
 	}
 
+	// Build map of new IDs
 	newIDs := make(map[string]bool)
 	for _, srv := range servers {
 		newIDs[srv.ID] = true
 	}
 
-	if err := s.deleteRemovedServers(tx, existingIDs, newIDs); err != nil {
-		return err
-	}
-
-	return s.upsertServers(tx, servers)
-}
-
-// getExistingServerIDs returns a set of existing server IDs.
-func (s *DBStore) getExistingServerIDs(tx *sql.Tx) (map[string]bool, error) {
-	existingIDs := make(map[string]bool)
-	rows, err := tx.Query(`SELECT id FROM servers`)
-	if err != nil {
-		return nil, err
-	}
-	defer func() { _ = rows.Close() }()
-
-	for rows.Next() {
-		var id string
-		if err := rows.Scan(&id); err != nil {
-			return nil, err
-		}
-		existingIDs[id] = true
-	}
-	return existingIDs, rows.Err()
-}
-
-// deleteRemovedServers deletes servers that are no longer in the config.
-func (s *DBStore) deleteRemovedServers(tx *sql.Tx, existingIDs, newIDs map[string]bool) error {
-	for id := range existingIDs {
+	// Delete removed servers
+	for _, id := range existingIDs {
 		if !newIDs[id] {
-			if _, err := tx.Exec(`DELETE FROM servers WHERE id = $1`, id); err != nil {
+			if err := tx.Delete(&Server{}, "id = ?", id).Error; err != nil {
 				return err
 			}
 		}
 	}
-	return nil
-}
 
-// upsertServers inserts or updates servers in the database.
-func (s *DBStore) upsertServers(tx *sql.Tx, servers []ServerEntry) error {
+	// Upsert servers
 	for _, srv := range servers {
-		_, err := tx.Exec(`
-			INSERT INTO servers (id, guild_id, guild_name, guild_icon, channel_id, channel_name, connect_on_start, priority, updated_at)
-			VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, NULLIF($6, ''), $7, $8, NOW())
-			ON CONFLICT (id) DO UPDATE SET
-				guild_id = EXCLUDED.guild_id,
-				guild_name = EXCLUDED.guild_name,
-				guild_icon = EXCLUDED.guild_icon,
-				channel_id = EXCLUDED.channel_id,
-				channel_name = EXCLUDED.channel_name,
-				connect_on_start = EXCLUDED.connect_on_start,
-				priority = EXCLUDED.priority,
-				updated_at = NOW()
-		`, srv.ID, srv.GuildID, srv.GuildName, srv.GuildIcon, srv.ChannelID, srv.ChannelName, srv.ConnectOnStart, srv.Priority)
-		if err != nil {
+		server := Server{
+			ID:             srv.ID,
+			GuildID:        srv.GuildID,
+			GuildName:      stringToPtr(srv.GuildName),
+			GuildIcon:      stringToPtr(srv.GuildIcon),
+			ChannelID:      srv.ChannelID,
+			ChannelName:    stringToPtr(srv.ChannelName),
+			ConnectOnStart: srv.ConnectOnStart,
+			Priority:       srv.Priority,
+		}
+		if err := tx.Save(&server).Error; err != nil {
 			return err
 		}
 	}
+
 	return nil
 }
 
 // Close closes the database connection.
 func (s *DBStore) Close() error {
-	return s.db.Close()
+	sqlDB, err := s.db.DB()
+	if err != nil {
+		return err
+	}
+	return sqlDB.Close()
 }
 
-// LogEntry represents a stored log entry.
+// LogEntry represents a stored log entry for API responses.
 type LogEntry struct {
 	Level     string    `json:"level"`
 	Message   string    `json:"message"`
@@ -422,26 +341,29 @@ type LogEntry struct {
 // MaxLogEntries is the maximum number of log entries to keep in the database.
 const MaxLogEntries = 1000
 
+// whereServerID is the query condition for server_id lookups.
+const whereServerID = "server_id = ?"
+
 // AddLog inserts a new log entry and trims old entries if needed.
 func (s *DBStore) AddLog(level, message string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec(`
-		INSERT INTO logs (level, message) VALUES ($1, $2)
-	`, level, message)
-	if err != nil {
+	if err := s.db.Create(&Log{
+		Level:   level,
+		Message: message,
+	}).Error; err != nil {
 		return err
 	}
 
-	// Trim old logs to keep only the last MaxLogEntries
-	_, err = s.db.Exec(`
+	// Trim old logs using subquery
+	s.db.Exec(`
 		DELETE FROM logs WHERE id NOT IN (
-			SELECT id FROM logs ORDER BY created_at DESC LIMIT $1
+			SELECT id FROM logs ORDER BY created_at DESC LIMIT ?
 		)
 	`, MaxLogEntries)
 
-	return err
+	return nil
 }
 
 // GetLogs retrieves log entries, optionally filtered by level.
@@ -450,38 +372,27 @@ func (s *DBStore) GetLogs(level string) ([]LogEntry, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var rows *sql.Rows
-	var err error
+	var logs []Log
+	query := s.db.Order("created_at ASC").Limit(MaxLogEntries)
 
-	if level == "" {
-		rows, err = s.db.Query(`
-			SELECT level, message, created_at FROM logs
-			ORDER BY created_at ASC
-			LIMIT $1
-		`, MaxLogEntries)
-	} else {
-		rows, err = s.db.Query(`
-			SELECT level, message, created_at FROM logs
-			WHERE level = $1
-			ORDER BY created_at ASC
-			LIMIT $2
-		`, level, MaxLogEntries)
+	if level != "" {
+		query = query.Where("level = ?", level)
 	}
-	if err != nil {
+
+	if err := query.Find(&logs).Error; err != nil {
 		return nil, err
 	}
-	defer func() { _ = rows.Close() }()
 
-	var logs []LogEntry
-	for rows.Next() {
-		var log LogEntry
-		if err := rows.Scan(&log.Level, &log.Message, &log.Timestamp); err != nil {
-			return nil, err
+	result := make([]LogEntry, len(logs))
+	for i, log := range logs {
+		result[i] = LogEntry{
+			Level:     log.Level,
+			Message:   log.Message,
+			Timestamp: log.CreatedAt,
 		}
-		logs = append(logs, log)
 	}
 
-	return logs, rows.Err()
+	return result, nil
 }
 
 // ClearLogs removes all log entries from the database.
@@ -489,8 +400,7 @@ func (s *DBStore) ClearLogs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec(`DELETE FROM logs`)
-	return err
+	return s.db.Where("1 = 1").Delete(&Log{}).Error
 }
 
 // SessionState holds Discord Gateway session data for resumption.
@@ -506,16 +416,12 @@ func (s *DBStore) SaveSession(state SessionState) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec(`
-		INSERT INTO sessions (server_id, session_id, sequence, resume_url, updated_at)
-		VALUES ($1, $2, $3, $4, NOW())
-		ON CONFLICT (server_id) DO UPDATE SET
-			session_id = EXCLUDED.session_id,
-			sequence = EXCLUDED.sequence,
-			resume_url = EXCLUDED.resume_url,
-			updated_at = NOW()
-	`, state.ServerID, state.SessionID, state.Sequence, state.ResumeURL)
-	return err
+	return s.db.Save(&Session{
+		ServerID:  state.ServerID,
+		SessionID: state.SessionID,
+		Sequence:  state.Sequence,
+		ResumeURL: state.ResumeURL,
+	}).Error
 }
 
 // LoadSession retrieves saved session state for resumption.
@@ -523,19 +429,20 @@ func (s *DBStore) LoadSession(serverID string) (*SessionState, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	var state SessionState
-	err := s.db.QueryRow(`
-		SELECT server_id, session_id, sequence, resume_url FROM sessions
-		WHERE server_id = $1
-	`, serverID).Scan(&state.ServerID, &state.SessionID, &state.Sequence, &state.ResumeURL)
-
-	if err == sql.ErrNoRows {
-		return nil, nil
-	}
-	if err != nil {
+	var session Session
+	if err := s.db.First(&session, whereServerID, serverID).Error; err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, nil
+		}
 		return nil, err
 	}
-	return &state, nil
+
+	return &SessionState{
+		ServerID:  session.ServerID,
+		SessionID: session.SessionID,
+		Sequence:  session.Sequence,
+		ResumeURL: session.ResumeURL,
+	}, nil
 }
 
 // DeleteSession removes session state.
@@ -543,8 +450,7 @@ func (s *DBStore) DeleteSession(serverID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec(`DELETE FROM sessions WHERE server_id = $1`, serverID)
-	return err
+	return s.db.Delete(&Session{}, whereServerID, serverID).Error
 }
 
 // UpdateSessionSequence updates just the sequence number for a session.
@@ -552,9 +458,7 @@ func (s *DBStore) UpdateSessionSequence(serverID string, sequence int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
-	_, err := s.db.Exec(`
-		UPDATE sessions SET sequence = $1, updated_at = NOW()
-		WHERE server_id = $2
-	`, sequence, serverID)
-	return err
+	return s.db.Model(&Session{}).
+		Where(whereServerID, serverID).
+		Update("sequence", sequence).Error
 }
