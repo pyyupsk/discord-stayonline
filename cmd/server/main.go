@@ -54,7 +54,11 @@ func main() {
 		os.Exit(1)
 	}
 
-	router := api.NewRouter(store, sessionMgr, hub, webFS, logger)
+	router, err := api.NewRouter(store, sessionMgr, hub, webFS, logger)
+	if err != nil {
+		slog.Error("Failed to create router", "error", err)
+		os.Exit(1)
+	}
 	srv := createServer(port, router.Setup())
 
 	go startSessionManager(sessionMgr)

@@ -27,16 +27,16 @@ type Router struct {
 }
 
 // NewRouter creates a new API router.
-func NewRouter(store config.ConfigStore, mgr *manager.SessionManager, hub *ws.Hub, webFS fs.FS, logger *slog.Logger) *Router {
+// Returns an error if API_KEY environment variable is not set.
+func NewRouter(store config.ConfigStore, mgr *manager.SessionManager, hub *ws.Hub, webFS fs.FS, logger *slog.Logger) (*Router, error) {
 	if logger == nil {
 		logger = slog.Default()
 	}
-	auth := middleware.NewAuth(logger)
-	if auth.IsEnabled() {
-		logger.Info("API key authentication enabled")
-	} else {
-		logger.Warn("API key authentication disabled - set API_KEY environment variable to enable")
+	auth, err := middleware.NewAuth(logger)
+	if err != nil {
+		return nil, err
 	}
+	logger.Info("API key authentication enabled")
 	return &Router{
 		mux:     http.NewServeMux(),
 		store:   store,
@@ -45,7 +45,7 @@ func NewRouter(store config.ConfigStore, mgr *manager.SessionManager, hub *ws.Hu
 		webFS:   webFS,
 		logger:  logger,
 		auth:    auth,
-	}
+	}, nil
 }
 
 // Setup configures all HTTP routes.

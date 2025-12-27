@@ -83,14 +83,6 @@ func (h *AuthHandler) Logout(w http.ResponseWriter, r *http.Request) {
 
 // Check handles GET /api/auth/check requests.
 func (h *AuthHandler) Check(w http.ResponseWriter, r *http.Request) {
-	if !h.auth.IsEnabled() {
-		responses.JSON(w, http.StatusOK, map[string]any{
-			"authenticated": true,
-			"auth_required": false,
-		})
-		return
-	}
-
 	cookie, err := r.Cookie(middleware.CookieName)
 	authenticated := err == nil && h.auth.ValidateKey(cookie.Value)
 
