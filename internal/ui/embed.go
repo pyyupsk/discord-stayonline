@@ -19,6 +19,13 @@ func SPAHandler(fsys fs.FS) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		urlPath := r.URL.Path
 
+		// Don't serve SPA for API routes - these should be handled by API handlers
+		// If we reach here, it means the route wasn't matched, so return 404
+		if urlPath == "/health" || strings.HasPrefix(urlPath, "/api/") || urlPath == "/ws" {
+			http.NotFound(w, r)
+			return
+		}
+
 		// Clean the path
 		if urlPath == "" || urlPath == "/" {
 			fileServer.ServeHTTP(w, r)
