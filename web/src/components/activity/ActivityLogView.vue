@@ -1,12 +1,11 @@
 <script setup lang="ts">
-import { Activity, Filter, Trash2 } from "lucide-vue-next";
+import { Activity, Trash2 } from "lucide-vue-next";
 import { computed, ref } from "vue";
 
 import type { LogEntry, ServerEntry } from "@/types";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { ScrollArea } from "@/components/ui/scroll-area";
 import {
   Select,
   SelectContent,
@@ -39,12 +38,10 @@ const serverFilter = ref<string>("all");
 const filteredLogs = computed(() => {
   let result = [...props.logs];
 
-  // Filter by level
   if (props.filter !== "all") {
     result = result.filter((log) => log.level === props.filter);
   }
 
-  // Filter by server
   if (serverFilter.value !== "all") {
     result = result.filter((log) => log.serverId === serverFilter.value);
   }
@@ -54,19 +51,17 @@ const filteredLogs = computed(() => {
 </script>
 
 <template>
-  <div class="flex min-h-0 flex-1 flex-col space-y-4">
+  <div class="space-y-4">
     <!-- Header -->
-    <div class="flex items-center justify-between">
+    <div class="flex flex-wrap items-center justify-between gap-4">
       <div>
         <h1 class="text-2xl font-bold">Activity Log</h1>
-        <p class="text-muted-foreground">{{ filteredLogs.length }} entries</p>
+        <p class="text-muted-foreground text-sm">{{ filteredLogs.length }} entries</p>
       </div>
 
-      <div class="flex items-center gap-3">
-        <!-- Server Filter -->
+      <div class="flex flex-wrap items-center gap-2">
         <Select v-model="serverFilter">
-          <SelectTrigger class="w-[180px]">
-            <Filter />
+          <SelectTrigger class="w-[160px]">
             <SelectValue placeholder="All Servers" />
           </SelectTrigger>
           <SelectContent>
@@ -77,12 +72,11 @@ const filteredLogs = computed(() => {
           </SelectContent>
         </Select>
 
-        <!-- Level Filter -->
         <Select
           :model-value="filter"
           @update:model-value="(val) => emit('update:filter', String(val))"
         >
-          <SelectTrigger class="w-[140px]">
+          <SelectTrigger class="w-[130px]">
             <SelectValue placeholder="All Levels" />
           </SelectTrigger>
           <SelectContent>
@@ -93,50 +87,47 @@ const filteredLogs = computed(() => {
           </SelectContent>
         </Select>
 
-        <!-- Clear Button -->
         <Button variant="outline" size="sm" @click="emit('clear')">
-          <Trash2 />
+          <Trash2 class="size-4" />
           Clear
         </Button>
       </div>
     </div>
 
     <!-- Log List -->
-    <ScrollArea class="border-border/50 bg-card min-h-0 flex-1 rounded-xl border">
+    <div class="bg-card border-border/50 rounded-lg border">
       <div class="divide-border/50 divide-y">
         <div
           v-for="(log, index) in filteredLogs"
           :key="index"
-          class="hover:bg-muted/30 flex items-start gap-4 p-4 transition-colors"
+          class="hover:bg-muted/30 flex items-start gap-4 px-4 py-3 transition-colors"
         >
           <!-- Time -->
-          <div class="w-20 shrink-0 text-right">
-            <p class="text-muted-foreground font-mono text-sm">
+          <div class="w-16 shrink-0 pt-0.5 text-right">
+            <p class="text-muted-foreground font-mono text-xs">
               {{ formatActivityTime(log.time) }}
             </p>
-            <p class="text-muted-foreground/60 text-xs">{{ formatActivityDate(log.time) }}</p>
+            <p class="text-muted-foreground/60 text-[10px]">{{ formatActivityDate(log.time) }}</p>
           </div>
 
           <!-- Icon -->
-          <div class="pt-0.5">
-            <component
-              :is="getActionIcon(log.action)"
-              class="h-5 w-5"
-              :class="[
-                getActionTextColor(log.action),
-                { 'animate-spin': isSpinningAction(log.action) },
-              ]"
-            />
-          </div>
+          <component
+            :is="getActionIcon(log.action)"
+            class="mt-0.5 size-4 shrink-0"
+            :class="[
+              getActionTextColor(log.action),
+              { 'animate-spin': isSpinningAction(log.action) },
+            ]"
+          />
 
           <!-- Content -->
           <div class="min-w-0 flex-1">
             <p class="text-sm">{{ log.message }}</p>
-            <div class="mt-1 flex items-center gap-2">
-              <Badge v-if="log.serverName" variant="outline" class="text-xs">
+            <div class="mt-1 flex flex-wrap items-center gap-1.5">
+              <Badge v-if="log.serverName" variant="outline" class="text-[10px]">
                 {{ log.serverName }}
               </Badge>
-              <Badge :variant="getLevelBadgeVariant(log.level)" class="text-xs capitalize">
+              <Badge :variant="getLevelBadgeVariant(log.level)" class="text-[10px] capitalize">
                 {{ log.level }}
               </Badge>
             </div>
@@ -144,15 +135,12 @@ const filteredLogs = computed(() => {
         </div>
 
         <!-- Empty State -->
-        <div
-          v-if="filteredLogs.length === 0"
-          class="flex flex-col items-center justify-center py-16"
-        >
-          <Activity class="text-muted-foreground/50 mb-4 h-12 w-12" />
-          <p class="text-lg font-medium">No activity yet</p>
+        <div v-if="filteredLogs.length === 0" class="flex flex-col items-center py-12">
+          <Activity class="text-muted-foreground/50 mb-3 size-10" />
+          <p class="font-medium">No activity yet</p>
           <p class="text-muted-foreground text-sm">Logs will appear here as events occur</p>
         </div>
       </div>
-    </ScrollArea>
+    </div>
   </div>
 </template>
