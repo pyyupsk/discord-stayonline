@@ -3,9 +3,9 @@ import { LogOut, Wifi, WifiOff } from "lucide-vue-next";
 
 import type { Status } from "@/types";
 
-import ModeToggle from "@/components/ModeToggle.vue";
-import ServerForm from "@/components/ServerForm.vue";
-import TosModal from "@/components/TosModal.vue";
+import ModeToggle from "@/components/layout/ModeToggle.vue";
+import TosModal from "@/components/modals/TosModal.vue";
+import ServerForm from "@/components/servers/ServerForm.vue";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
