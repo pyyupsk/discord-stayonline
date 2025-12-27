@@ -4,6 +4,13 @@ import { computed } from "vue";
 
 import type { ConnectionStatus, LogEntry, ServerEntry } from "@/types";
 
+import {
+  formatActivityTime,
+  getActionIcon,
+  getActionTextColor,
+  isSpinningAction,
+} from "@/lib/activity";
+
 import StatCard from "./StatCard.vue";
 
 const props = defineProps<{
@@ -139,19 +146,18 @@ const serverStats = computed(() => {
           :key="index"
           class="flex items-center gap-3 p-4"
         >
-          <div
-            class="h-2 w-2 rounded-full"
-            :class="{
-              'bg-success': log.action === 'connected',
-              'bg-destructive': log.action === 'error' || log.action === 'disconnected',
-              'bg-warning': log.action === 'connecting' || log.action === 'backoff',
-              'bg-muted-foreground': !log.action,
-            }"
+          <component
+            :is="getActionIcon(log.action)"
+            class="h-4 w-4 shrink-0"
+            :class="[
+              getActionTextColor(log.action),
+              { 'animate-spin': isSpinningAction(log.action) },
+            ]"
           />
           <div class="flex-1">
             <p class="text-sm">{{ log.message }}</p>
             <p class="text-muted-foreground text-xs">
-              {{ log.time.toLocaleTimeString() }}
+              {{ formatActivityTime(log.time) }}
               <span v-if="log.serverName"> &middot; {{ log.serverName }}</span>
             </p>
           </div>

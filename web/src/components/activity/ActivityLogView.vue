@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Activity, CheckCircle2, Filter, Info, Loader2, Trash2, XCircle } from "lucide-vue-next";
+import { Activity, Filter, Trash2 } from "lucide-vue-next";
 import { computed, ref } from "vue";
 
 import type { LogEntry, ServerEntry } from "@/types";
@@ -14,6 +14,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import {
+  formatActivityDate,
+  formatActivityTime,
+  getActionIcon,
+  getActionTextColor,
+  getLevelBadgeVariant,
+  isSpinningAction,
+} from "@/lib/activity";
 
 const props = defineProps<{
   filter: string;
@@ -43,74 +51,6 @@ const filteredLogs = computed(() => {
 
   return result;
 });
-
-function formatDate(date: Date): string {
-  const today = new Date();
-  const yesterday = new Date(today);
-  yesterday.setDate(yesterday.getDate() - 1);
-
-  if (date.toDateString() === today.toDateString()) {
-    return "Today";
-  } else if (date.toDateString() === yesterday.toDateString()) {
-    return "Yesterday";
-  }
-  return date.toLocaleDateString("en-US", { day: "numeric", month: "short" });
-}
-
-function formatTime(date: Date): string {
-  return date.toLocaleTimeString("en-US", {
-    hour: "2-digit",
-    hour12: false,
-    minute: "2-digit",
-    second: "2-digit",
-  });
-}
-
-function getActionColor(action?: string): string {
-  switch (action) {
-    case "backoff":
-    case "connecting":
-      return "text-warning";
-    case "connected":
-      return "text-success";
-    case "disconnected":
-    case "error":
-      return "text-destructive";
-    case "system":
-      return "text-primary";
-    default:
-      return "text-muted-foreground";
-  }
-}
-
-function getActionIcon(action?: string) {
-  switch (action) {
-    case "backoff":
-    case "connecting":
-      return Loader2;
-    case "config":
-    case "system":
-      return Info;
-    case "connected":
-      return CheckCircle2;
-    case "disconnected":
-    case "error":
-      return XCircle;
-    default:
-      return Activity;
-  }
-}
-
-function getLevelBadgeVariant(level: string) {
-  switch (level) {
-    case "error":
-      return "destructive";
-    case "warn":
-      return "secondary";
-    default:
-      return "outline";
-  }
-}
 </script>
 
 <template>
@@ -171,8 +111,10 @@ function getLevelBadgeVariant(level: string) {
         >
           <!-- Time -->
           <div class="w-20 shrink-0 text-right">
-            <p class="text-muted-foreground font-mono text-sm">{{ formatTime(log.time) }}</p>
-            <p class="text-muted-foreground/60 text-xs">{{ formatDate(log.time) }}</p>
+            <p class="text-muted-foreground font-mono text-sm">
+              {{ formatActivityTime(log.time) }}
+            </p>
+            <p class="text-muted-foreground/60 text-xs">{{ formatActivityDate(log.time) }}</p>
           </div>
 
           <!-- Icon -->
@@ -181,8 +123,8 @@ function getLevelBadgeVariant(level: string) {
               :is="getActionIcon(log.action)"
               class="h-5 w-5"
               :class="[
-                getActionColor(log.action),
-                { 'animate-spin': log.action === 'connecting' || log.action === 'backoff' },
+                getActionTextColor(log.action),
+                { 'animate-spin': isSpinningAction(log.action) },
               ]"
             />
           </div>
