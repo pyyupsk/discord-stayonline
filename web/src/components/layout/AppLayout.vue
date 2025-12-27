@@ -109,8 +109,8 @@ function getStatusLabel(status: Status): string {
                     <span
                       class="h-2.5 w-2.5 rounded-full"
                       :class="{
-                        'bg-success': config.status === 'online',
-                        'bg-warning': config.status === 'idle',
+                        'bg-green-500': config.status === 'online',
+                        'bg-yellow-500': config.status === 'idle',
                         'bg-destructive': config.status === 'dnd',
                       }"
                     />
@@ -121,13 +121,13 @@ function getStatusLabel(status: Status): string {
               <SelectContent>
                 <SelectItem value="online">
                   <div class="flex items-center gap-2">
-                    <span class="bg-success h-2.5 w-2.5 rounded-full" />
+                    <span class="h-2.5 w-2.5 rounded-full bg-green-500" />
                     Online
                   </div>
                 </SelectItem>
                 <SelectItem value="idle">
                   <div class="flex items-center gap-2">
-                    <span class="bg-warning h-2.5 w-2.5 rounded-full" />
+                    <span class="h-2.5 w-2.5 rounded-full bg-yellow-500" />
                     Idle
                   </div>
                 </SelectItem>

@@ -33,6 +33,7 @@ export type ServerEntry = {
   channel_id: string;
   channel_name?: string;
   connect_on_start: boolean;
+  guild_icon?: string;
   guild_id: string;
   guild_name?: string;
   id: string;

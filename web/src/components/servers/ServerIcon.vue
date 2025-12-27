@@ -42,9 +42,9 @@ const statusColor = computed(() => {
   switch (props.status) {
     case "backoff":
     case "connecting":
-      return "bg-warning";
+      return "bg-yellow-500";
     case "connected":
-      return "bg-success";
+      return "bg-green-500";
     case "error":
       return "bg-destructive";
     default:
@@ -119,14 +119,14 @@ const isConnecting = computed(() => {
 }
 
 .discord-server-icon.connected {
-  background: color-mix(in srgb, var(--success) 20%, transparent);
-  color: var(--success);
+  background: color-mix(in srgb, var(--color-green-500) 20%, transparent);
+  color: var(--color-green-500);
 }
 
 .discord-server-icon.connected:hover,
 .discord-server-icon.connected.selected {
-  background: var(--success);
-  color: var(--success-foreground);
+  background: var(--color-green-500);
+  color: var(--color-green-50);
 }
 
 .discord-server-icon:not(.connected):hover {

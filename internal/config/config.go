@@ -21,6 +21,9 @@ type ServerEntry struct {
 	// GuildName is an optional friendly name for the server
 	GuildName string `json:"guild_name,omitempty"`
 
+	// GuildIcon is the Discord server icon hash (for CDN URL construction)
+	GuildIcon string `json:"guild_icon,omitempty"`
+
 	// ChannelID is the Discord voice channel ID (snowflake)
 	ChannelID string `json:"channel_id"`
 

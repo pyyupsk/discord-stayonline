@@ -63,6 +63,7 @@ func (s *DBStore) migrate() error {
 			id VARCHAR(32) PRIMARY KEY,
 			guild_id VARCHAR(20) NOT NULL,
 			guild_name VARCHAR(100),
+			guild_icon VARCHAR(64),
 			channel_id VARCHAR(20) NOT NULL,
 			channel_name VARCHAR(100),
 			connect_on_start BOOLEAN NOT NULL DEFAULT FALSE,
@@ -83,6 +84,9 @@ func (s *DBStore) migrate() error {
 	if err != nil {
 		return err
 	}
+
+	// Add guild_icon column if it doesn't exist (migration for existing tables)
+	_, _ = s.db.Exec(`ALTER TABLE servers ADD COLUMN IF NOT EXISTS guild_icon VARCHAR(64)`)
 
 	// Create logs table
 	_, err = s.db.Exec(`
@@ -261,7 +265,7 @@ func (s *DBStore) Load() (*Configuration, error) {
 
 	// Load servers ordered by priority
 	rows, err := s.db.Query(`
-		SELECT id, guild_id, COALESCE(guild_name, ''), channel_id, COALESCE(channel_name, ''), connect_on_start, priority
+		SELECT id, guild_id, COALESCE(guild_name, ''), COALESCE(guild_icon, ''), channel_id, COALESCE(channel_name, ''), connect_on_start, priority
 		FROM servers
 		ORDER BY priority ASC, created_at ASC
 	`)
@@ -272,7 +276,7 @@ func (s *DBStore) Load() (*Configuration, error) {
 
 	for rows.Next() {
 		var srv ServerEntry
-		err := rows.Scan(&srv.ID, &srv.GuildID, &srv.GuildName, &srv.ChannelID, &srv.ChannelName, &srv.ConnectOnStart, &srv.Priority)
+		err := rows.Scan(&srv.ID, &srv.GuildID, &srv.GuildName, &srv.GuildIcon, &srv.ChannelID, &srv.ChannelName, &srv.ConnectOnStart, &srv.Priority)
 		if err != nil {
 			return nil, err
 		}
@@ -384,17 +388,18 @@ func (s *DBStore) deleteRemovedServers(tx *sql.Tx, existingIDs, newIDs map[strin
 func (s *DBStore) upsertServers(tx *sql.Tx, servers []ServerEntry) error {
 	for _, srv := range servers {
 		_, err := tx.Exec(`
-			INSERT INTO servers (id, guild_id, guild_name, channel_id, channel_name, connect_on_start, priority, updated_at)
-			VALUES ($1, $2, NULLIF($3, ''), $4, NULLIF($5, ''), $6, $7, NOW())
+			INSERT INTO servers (id, guild_id, guild_name, guild_icon, channel_id, channel_name, connect_on_start, priority, updated_at)
+			VALUES ($1, $2, NULLIF($3, ''), NULLIF($4, ''), $5, NULLIF($6, ''), $7, $8, NOW())
 			ON CONFLICT (id) DO UPDATE SET
 				guild_id = EXCLUDED.guild_id,
 				guild_name = EXCLUDED.guild_name,
+				guild_icon = EXCLUDED.guild_icon,
 				channel_id = EXCLUDED.channel_id,
 				channel_name = EXCLUDED.channel_name,
 				connect_on_start = EXCLUDED.connect_on_start,
 				priority = EXCLUDED.priority,
 				updated_at = NOW()
-		`, srv.ID, srv.GuildID, srv.GuildName, srv.ChannelID, srv.ChannelName, srv.ConnectOnStart, srv.Priority)
+		`, srv.ID, srv.GuildID, srv.GuildName, srv.GuildIcon, srv.ChannelID, srv.ChannelName, srv.ConnectOnStart, srv.Priority)
 		if err != nil {
 			return err
 		}

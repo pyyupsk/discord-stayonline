@@ -47,6 +47,24 @@ const serverStats = computed(() => {
     status: props.serverStatuses.get(server.id) || "disconnected",
   }));
 });
+
+function getGuildIconUrl(guildId: string, iconHash: string) {
+  return `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.png?size=64`;
+}
+
+function getStatusColor(status: ConnectionStatus) {
+  switch (status) {
+    case "backoff":
+    case "connecting":
+      return "bg-yellow-500";
+    case "connected":
+      return "bg-green-500";
+    case "error":
+      return "bg-destructive";
+    default:
+      return "bg-muted-foreground";
+  }
+}
 </script>
 
 <template>
@@ -95,16 +113,20 @@ const serverStats = computed(() => {
           class="flex items-center justify-between p-4"
         >
           <div class="flex items-center gap-3">
-            <div
-              class="flex h-10 w-10 items-center justify-center rounded-full text-sm font-medium"
-              :class="{
-                'bg-success/20 text-success': status === 'connected',
-                'bg-warning/20 text-warning': status === 'connecting' || status === 'backoff',
-                'bg-destructive/20 text-destructive': status === 'error',
-                'bg-muted text-muted-foreground': status === 'disconnected',
-              }"
-            >
-              {{ (server.guild_name || server.guild_id).slice(0, 2).toUpperCase() }}
+            <div class="relative">
+              <img
+                :src="
+                  server.guild_icon
+                    ? getGuildIconUrl(server.guild_id, server.guild_icon)
+                    : `https://ui-avatars.com/api/?name=${(server.guild_name || server.guild_id).slice(0, 2).toUpperCase()}`
+                "
+                :alt="server.guild_name || 'Server'"
+                class="h-10 w-10 rounded-full object-cover"
+              />
+              <span
+                class="border-background absolute -right-0.5 -bottom-0.5 size-3 rounded-full border"
+                :class="getStatusColor(serverStatuses.get(server.id) || 'disconnected')"
+              />
             </div>
             <div>
               <p class="font-medium">
@@ -117,12 +139,7 @@ const serverStats = computed(() => {
           </div>
           <div
             class="rounded-full px-3 py-1 text-xs font-medium capitalize"
-            :class="{
-              'bg-success/20 text-success': status === 'connected',
-              'bg-warning/20 text-warning': status === 'connecting' || status === 'backoff',
-              'bg-destructive/20 text-destructive': status === 'error',
-              'bg-muted text-muted-foreground': status === 'disconnected',
-            }"
+            :class="getStatusColor(status)"
           >
             {{ status }}
           </div>

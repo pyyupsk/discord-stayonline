@@ -23,8 +23,8 @@ defineProps<{
         :class="{
           'bg-muted': variant === 'default' || !variant,
           'bg-primary/20': variant === 'primary',
-          'bg-success/20': variant === 'success',
-          'bg-warning/20': variant === 'warning',
+          'bg-green-500/20': variant === 'success',
+          'bg-yellow-500/20': variant === 'warning',
           'bg-destructive/20': variant === 'destructive',
         }"
       >
@@ -34,8 +34,8 @@ defineProps<{
           :class="{
             'text-muted-foreground': variant === 'default' || !variant,
             'text-primary': variant === 'primary',
-            'text-success': variant === 'success',
-            'text-warning': variant === 'warning',
+            'text-green-500': variant === 'success',
+            'text-yellow-500': variant === 'warning',
             'text-destructive': variant === 'destructive',
           }"
         />

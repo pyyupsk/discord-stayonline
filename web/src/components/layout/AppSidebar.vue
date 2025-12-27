@@ -70,13 +70,17 @@ const connectedCount = computed(() => {
   return count;
 });
 
+function getGuildIconUrl(guildId: string, iconHash: string) {
+  return `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.png?size=64`;
+}
+
 function getStatusColor(status: ConnectionStatus) {
   switch (status) {
     case "backoff":
     case "connecting":
-      return "bg-warning";
+      return "bg-yellow-500";
     case "connected":
-      return "bg-success";
+      return "bg-green-500";
     case "error":
       return "bg-destructive";
     default:
@@ -109,7 +113,7 @@ function getStatusColor(status: ConnectionStatus) {
       </SidebarMenu>
     </SidebarHeader>
 
-    <SidebarContent>
+    <SidebarContent class="overflow-hidden">
       <!-- Navigation -->
       <SidebarGroup>
         <SidebarGroupLabel>Navigation</SidebarGroupLabel>
@@ -149,11 +153,15 @@ function getStatusColor(status: ConnectionStatus) {
                 @click="navigateToServer(server.id)"
               >
                 <div class="relative">
-                  <div
-                    class="bg-muted text-muted-foreground flex size-5 items-center justify-center rounded text-xs font-medium"
-                  >
-                    {{ (server.guild_name || server.guild_id).slice(0, 2).toUpperCase() }}
-                  </div>
+                  <img
+                    :src="
+                      server.guild_icon
+                        ? getGuildIconUrl(server.guild_id, server.guild_icon)
+                        : `https://ui-avatars.com/api/?name=${(server.guild_name || server.guild_id).slice(0, 2).toUpperCase()}`
+                    "
+                    :alt="server.guild_name || 'Server'"
+                    class="size-5 rounded-full object-cover"
+                  />
                   <span
                     class="border-background absolute -right-0.5 -bottom-0.5 size-2 rounded-full border"
                     :class="getStatusColor(serverStatuses.get(server.id) || 'disconnected')"
@@ -164,7 +172,7 @@ function getStatusColor(status: ConnectionStatus) {
                 </span>
               </SidebarMenuButton>
               <SidebarMenuBadge v-if="actionLoading.get(server.id)">
-                <span class="bg-warning size-2 animate-pulse rounded-full" />
+                <span class="size-2 animate-pulse rounded-full bg-yellow-500" />
               </SidebarMenuBadge>
             </SidebarMenuItem>
 
@@ -185,7 +193,7 @@ function getStatusColor(status: ConnectionStatus) {
             :disabled="connectedCount === servers.length || servers.length === 0"
             @click="connectAll"
           >
-            <Power class="text-success" />
+            <Power class="text-green-500" />
             <span>Connect All</span>
           </SidebarMenuButton>
         </SidebarMenuItem>

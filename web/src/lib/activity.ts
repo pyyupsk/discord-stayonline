@@ -39,9 +39,9 @@ export function getActionBgColor(action?: string): string {
   switch (action) {
     case "backoff":
     case "connecting":
-      return "bg-warning";
+      return "bg-yellow-500";
     case "connected":
-      return "text-success";
+      return "text-green-500";
     case "disconnected":
     case "error":
       return "bg-destructive";
@@ -72,9 +72,9 @@ export function getActionTextColor(action?: string): string {
   switch (action) {
     case "backoff":
     case "connecting":
-      return "text-warning";
+      return "text-yellow-500";
     case "connected":
-      return "text-success";
+      return "text-green-500";
     case "disconnected":
     case "error":
       return "text-destructive";

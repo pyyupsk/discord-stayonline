@@ -38,19 +38,19 @@ const statusConfig = computed(() => {
   switch (props.status) {
     case "backoff":
       return {
-        class: "bg-warning/20 text-warning border-warning/50",
+        class: "bg-yellow-500/20 text-yellow-500 border-yellow-500/50",
         label: "Reconnecting",
         variant: "secondary" as const,
       };
     case "connected":
       return {
-        class: "bg-success/20 text-success border-success/50",
+        class: "bg-green-500/20 text-green-500 border-green-500/50",
         label: "Connected",
         variant: "default" as const,
       };
     case "connecting":
       return {
-        class: "bg-warning/20 text-warning border-warning/50",
+        class: "bg-yellow-500/20 text-yellow-500 border-yellow-500/50",
         label: "Connecting",
         variant: "secondary" as const,
       };
@@ -68,6 +68,24 @@ const statusConfig = computed(() => {
 const recentLogs = computed(() => {
   return props.logs.slice(0, 10);
 });
+
+function getGuildIconUrl(guildId: string, iconHash: string) {
+  return `https://cdn.discordapp.com/icons/${guildId}/${iconHash}.png?size=128`;
+}
+
+function getStatusColor(status: ConnectionStatus) {
+  switch (status) {
+    case "backoff":
+    case "connecting":
+      return "bg-yellow-500";
+    case "connected":
+      return "bg-green-500";
+    case "error":
+      return "bg-destructive";
+    default:
+      return "bg-muted-foreground";
+  }
+}
 </script>
 
 <template>
@@ -75,15 +93,20 @@ const recentLogs = computed(() => {
     <!-- Server Header -->
     <div class="flex items-start justify-between">
       <div class="flex items-center gap-4">
-        <div
-          class="flex h-16 w-16 items-center justify-center rounded-2xl text-xl font-bold"
-          :class="{
-            'bg-success/20 text-success': isConnected,
-            'bg-warning/20 text-warning': isConnecting,
-            'bg-muted text-muted-foreground': !isConnected && !isConnecting,
-          }"
-        >
-          {{ displayName.slice(0, 2).toUpperCase() }}
+        <div class="relative">
+          <img
+            :src="
+              server.guild_icon
+                ? getGuildIconUrl(server.guild_id, server.guild_icon)
+                : `https://ui-avatars.com/api/?name=${(server.guild_name || server.guild_id).slice(0, 2).toUpperCase()}`
+            "
+            :alt="displayName"
+            class="h-16 w-16 rounded-2xl object-cover"
+          />
+          <span
+            class="border-background absolute -right-1 -bottom-1 size-4 rounded-full border-2"
+            :class="getStatusColor(props.status || 'disconnected')"
+          />
         </div>
         <div>
           <h1 class="inline-flex items-center gap-2 text-2xl font-bold">
@@ -177,9 +200,9 @@ const recentLogs = computed(() => {
           <div
             class="h-2 w-2 rounded-full"
             :class="{
-              'bg-success': log.action === 'connected',
+              'bg-green-500': log.action === 'connected',
               'bg-destructive': log.action === 'error' || log.action === 'disconnected',
-              'bg-warning': log.action === 'connecting' || log.action === 'backoff',
+              'bg-yellow-500': log.action === 'connecting' || log.action === 'backoff',
               'bg-primary': log.action === 'system',
               'bg-muted-foreground': !log.action,
             }"

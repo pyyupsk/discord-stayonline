@@ -124,6 +124,7 @@ function handleSubmit() {
     channel_id: channelId.value,
     channel_name: selectedChannel.value?.name,
     connect_on_start: connectOnStart.value,
+    guild_icon: selectedGuild.value?.icon,
     guild_id: guildId.value,
     guild_name: selectedGuild.value?.name,
     id: props.server?.id,

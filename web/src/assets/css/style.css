@@ -37,7 +37,7 @@
   }
 
   .status-glow {
-    box-shadow: 0 0 8px var(--success);
+    box-shadow: 0 0 8px var(--color-green-500);
   }
 
   .terminal-log {
