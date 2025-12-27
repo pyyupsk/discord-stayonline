@@ -1,26 +1,16 @@
 <script setup lang="ts">
-import { LogOut, Wifi, WifiOff } from "lucide-vue-next";
+import { Wifi, WifiOff } from "lucide-vue-next";
 
-import type { Status } from "@/types";
-
-import ModeToggle from "@/components/layout/ModeToggle.vue";
 import TosModal from "@/components/modals/TosModal.vue";
 import ServerForm from "@/components/servers/ServerForm.vue";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
 import { Separator } from "@/components/ui/separator";
 import { SidebarInset, SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { Skeleton } from "@/components/ui/skeleton";
 import { useDashboard } from "@/composables/useDashboard";
 
 import AppSidebar from "./AppSidebar.vue";
+import UserDropdown from "./UserDropdown.vue";
 
 const {
   actionLoading,
@@ -39,19 +29,6 @@ const {
   showServerForm,
   wsStatus,
 } = useDashboard();
-
-function getStatusLabel(status: Status): string {
-  switch (status) {
-    case "dnd":
-      return "Do Not Disturb";
-    case "idle":
-      return "Idle";
-    case "online":
-      return "Online";
-    default:
-      return status;
-  }
-}
 </script>
 
 <template>
@@ -97,57 +74,13 @@ function getStatusLabel(status: Status): string {
             {{ connectedCount }}/{{ config.servers.length }} Connected
           </Badge>
 
-          <div class="ml-auto flex items-center gap-3">
-            <!-- Status Selector -->
-            <Select
-              :model-value="config.status"
-              @update:model-value="(val) => handleStatusChange(String(val))"
-            >
-              <SelectTrigger class="w-[160px]">
-                <SelectValue>
-                  <div class="flex items-center gap-2">
-                    <span
-                      class="h-2.5 w-2.5 rounded-full"
-                      :class="{
-                        'bg-green-500': config.status === 'online',
-                        'bg-yellow-500': config.status === 'idle',
-                        'bg-destructive': config.status === 'dnd',
-                      }"
-                    />
-                    {{ getStatusLabel(config.status) }}
-                  </div>
-                </SelectValue>
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="online">
-                  <div class="flex items-center gap-2">
-                    <span class="h-2.5 w-2.5 rounded-full bg-green-500" />
-                    Online
-                  </div>
-                </SelectItem>
-                <SelectItem value="idle">
-                  <div class="flex items-center gap-2">
-                    <span class="h-2.5 w-2.5 rounded-full bg-yellow-500" />
-                    Idle
-                  </div>
-                </SelectItem>
-                <SelectItem value="dnd">
-                  <div class="flex items-center gap-2">
-                    <span class="bg-destructive h-2.5 w-2.5 rounded-full" />
-                    Do Not Disturb
-                  </div>
-                </SelectItem>
-              </SelectContent>
-            </Select>
-
-            <!-- Mode Toggle -->
-            <ModeToggle />
-
-            <!-- Logout Button -->
-            <Button variant="ghost" size="icon" @click="handleLogout">
-              <LogOut />
-            </Button>
-          </div>
+          <!-- User Dropdown -->
+          <UserDropdown
+            :status="config.status"
+            class="ml-auto"
+            @status-change="handleStatusChange"
+            @logout="handleLogout"
+          />
         </header>
 
         <!-- Content Area -->

@@ -59,6 +59,14 @@ export type Stats = {
 
 export type Status = "dnd" | "idle" | "online";
 
+export type UserInfo = {
+  avatar?: string;
+  discriminator: string;
+  global_name?: string;
+  id: string;
+  username: string;
+};
+
 export type VoiceChannelInfo = {
   id: string;
   name: string;

@@ -25,6 +25,15 @@ type cacheEntry struct {
 	expiresAt time.Time
 }
 
+// UserInfo contains basic Discord user information.
+type UserInfo struct {
+	ID            string `json:"id"`
+	Username      string `json:"username"`
+	Discriminator string `json:"discriminator"`
+	GlobalName    string `json:"global_name,omitempty"`
+	Avatar        string `json:"avatar,omitempty"`
+}
+
 // GuildInfo contains basic guild information.
 type GuildInfo struct {
 	ID   string `json:"id"`
@@ -177,6 +186,29 @@ func (h *DiscordHandler) GetServerInfo(w http.ResponseWriter, r *http.Request) {
 	}
 
 	writeJSON(w, http.StatusOK, info)
+}
+
+// GetCurrentUser handles GET /api/discord/user
+// Returns the current authenticated user's Discord profile.
+func (h *DiscordHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
+	cacheKey := "user:me"
+	if cached, ok := h.getFromCache(cacheKey); ok {
+		writeJSON(w, http.StatusOK, cached)
+		return
+	}
+
+	var user UserInfo
+	if err := h.fetchFromDiscord("/users/@me", &user); err != nil {
+		h.logger.Error("Failed to fetch current user", "error", err)
+		writeJSON(w, http.StatusInternalServerError, map[string]string{
+			"error":   "discord_error",
+			"message": "Failed to fetch user from Discord",
+		})
+		return
+	}
+
+	h.setCache(cacheKey, user)
+	writeJSON(w, http.StatusOK, user)
 }
 
 // GetUserGuilds handles GET /api/discord/guilds

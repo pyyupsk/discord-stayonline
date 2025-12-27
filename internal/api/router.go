@@ -78,6 +78,7 @@ func (r *Router) Setup() http.Handler {
 
 	// Discord info lookup handlers (protected)
 	discordHandler := NewDiscordHandler(r.logger)
+	r.mux.HandleFunc("GET /api/discord/user", r.auth.Protect(discordHandler.GetCurrentUser))
 	r.mux.HandleFunc("GET /api/discord/server-info", r.auth.Protect(discordHandler.GetServerInfo))
 	r.mux.HandleFunc("POST /api/discord/bulk-info", r.auth.Protect(discordHandler.GetBulkServerInfo))
 	r.mux.HandleFunc("GET /api/discord/guilds", r.auth.Protect(discordHandler.GetUserGuilds))
