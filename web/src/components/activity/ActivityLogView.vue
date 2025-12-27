@@ -88,7 +88,7 @@ const filteredLogs = computed(() => {
         </Select>
 
         <Button variant="outline" size="sm" @click="emit('clear')">
-          <Trash2 class="size-4" />
+          <Trash2 />
           Clear
         </Button>
       </div>

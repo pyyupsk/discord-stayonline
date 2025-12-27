@@ -68,9 +68,9 @@ const {
           <Separator orientation="vertical" class="mr-2 h-4" />
 
           <!-- Connection Badge -->
-          <Badge :variant="wsStatus === 'connected' ? 'default' : 'secondary'" class="gap-1.5">
-            <Wifi v-if="wsStatus === 'connected'" class="h-3 w-3" />
-            <WifiOff v-else class="h-3 w-3" />
+          <Badge :variant="wsStatus === 'connected' ? 'default' : 'secondary'">
+            <Wifi v-if="wsStatus === 'connected'" />
+            <WifiOff v-else />
             {{ connectedCount }}/{{ config.servers.length }} Connected
           </Badge>
 

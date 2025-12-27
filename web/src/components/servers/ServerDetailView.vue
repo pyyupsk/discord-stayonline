@@ -85,7 +85,7 @@ function getStatusBadge(status: ConnectionStatus) {
           <div class="flex items-center gap-2">
             <h1 class="text-2xl font-bold">{{ displayName }}</h1>
             <Badge variant="outline" :class="getStatusBadge(status).class">
-              <Loader2 v-if="isLoading || isConnecting" class="size-3 animate-spin" />
+              <Loader2 v-if="isLoading || isConnecting" class="animate-spin" />
               {{ getStatusBadge(status).label }}
             </Badge>
           </div>
@@ -95,7 +95,7 @@ function getStatusBadge(status: ConnectionStatus) {
 
       <div class="flex gap-2">
         <Button variant="outline" size="sm" @click="emit('edit')">
-          <Pencil class="size-4" />
+          <Pencil />
           Edit
         </Button>
         <Button
@@ -104,7 +104,7 @@ function getStatusBadge(status: ConnectionStatus) {
           class="text-destructive hover:bg-destructive/10"
           @click="emit('delete')"
         >
-          <Trash2 class="size-4" />
+          <Trash2 />
           Delete
         </Button>
       </div>
@@ -114,12 +114,12 @@ function getStatusBadge(status: ConnectionStatus) {
     <div class="flex flex-wrap gap-2">
       <Button v-if="!isConnected" :disabled="isLoading || isConnecting" @click="emit('join')">
         <Loader2 v-if="isLoading" class="animate-spin" />
-        <Play v-else class="size-4" />
+        <Play v-else />
         Connect
       </Button>
       <Button v-if="isConnected" variant="secondary" :disabled="isLoading" @click="emit('rejoin')">
         <Loader2 v-if="isLoading" class="animate-spin" />
-        <RotateCcw v-else class="size-4" />
+        <RotateCcw v-else />
         Reconnect
       </Button>
       <Button
@@ -129,7 +129,7 @@ function getStatusBadge(status: ConnectionStatus) {
         :disabled="isLoading"
         @click="emit('exit')"
       >
-        <Square class="size-4" />
+        <Square />
         Disconnect
       </Button>
     </div>
