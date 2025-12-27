@@ -65,6 +65,7 @@ func (h *ConfigHandler) ReplaceConfig(w http.ResponseWriter, r *http.Request) {
 		Status  config.Status        `json:"status,omitempty"`
 	}
 
+	limitBody(r)
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		h.logger.Error("Failed to decode request", "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]string{
@@ -132,6 +133,7 @@ func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Status  config.Status        `json:"status,omitempty"`
 	}
 
+	limitBody(r)
 	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
 		h.logger.Error("Failed to decode request", "error", err)
 		h.writeError(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")

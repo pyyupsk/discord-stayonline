@@ -309,6 +309,7 @@ func (h *DiscordHandler) GetBulkServerInfo(w http.ResponseWriter, r *http.Reques
 		ChannelID string `json:"channel_id"`
 	}
 
+	limitBody(r)
 	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
 		writeJSON(w, http.StatusBadRequest, map[string]string{
 			"error":   "invalid_request",

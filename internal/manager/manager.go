@@ -58,7 +58,6 @@ type Session struct {
 	cancel context.CancelFunc
 
 	stopReconnect chan struct{}
-	reconnecting  bool
 }
 
 // NewSessionManager creates a new session manager.
@@ -129,7 +128,12 @@ func (m *SessionManager) Stop() {
 			_ = session.client.Close()
 		}
 		if session.stopReconnect != nil {
-			close(session.stopReconnect)
+			select {
+			case <-session.stopReconnect:
+				// Already closed
+			default:
+				close(session.stopReconnect)
+			}
 		}
 	}
 }
@@ -211,8 +215,13 @@ func (m *SessionManager) Rejoin(serverID string) error {
 	}
 
 	// Stop reconnection loop
-	if session.stopReconnect != nil && !session.reconnecting {
-		close(session.stopReconnect)
+	if session.stopReconnect != nil {
+		select {
+		case <-session.stopReconnect:
+			// Already closed
+		default:
+			close(session.stopReconnect)
+		}
 	}
 
 	// Close existing connection

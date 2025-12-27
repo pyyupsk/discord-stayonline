@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
+	"strconv"
 	"time"
 
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
@@ -157,7 +158,7 @@ func formatDurationSecondsOnly(seconds int) string {
 }
 
 func formatInt(n int) string {
-	return string(rune('0'+n/10)) + string(rune('0'+n%10))
+	return strconv.Itoa(n)
 }
 
 // formatBytes formats bytes as a human-readable string.

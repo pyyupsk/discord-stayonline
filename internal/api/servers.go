@@ -78,6 +78,7 @@ func (h *ServersHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		Action string `json:"action"`
 	}
 
+	limitBody(r)
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		h.logger.Error("Failed to decode request", "error", err)
 		writeJSON(w, http.StatusBadRequest, map[string]string{
