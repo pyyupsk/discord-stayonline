@@ -14,6 +14,7 @@ import (
 	discordstayonline "github.com/pyyupsk/discord-stayonline"
 	"github.com/pyyupsk/discord-stayonline/internal/api"
 	"github.com/pyyupsk/discord-stayonline/internal/config"
+	"github.com/pyyupsk/discord-stayonline/internal/config/store"
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
 	"github.com/pyyupsk/discord-stayonline/internal/webhook"
 	"github.com/pyyupsk/discord-stayonline/internal/ws"
@@ -78,11 +79,11 @@ func getEnvOrDefault(key, defaultValue string) string {
 	return defaultValue
 }
 
-func initStore() (config.ConfigStore, *config.DBStore) {
+func initStore() (config.ConfigStore, *store.Postgres) {
 	databaseURL := os.Getenv("DATABASE_URL")
 	if databaseURL != "" {
 		slog.Info("Using PostgreSQL for configuration storage")
-		dbStore, err := config.NewDBStore(databaseURL)
+		dbStore, err := store.NewPostgres(databaseURL)
 		if err != nil {
 			slog.Error("Failed to connect to database", "error", err)
 			os.Exit(1)
@@ -92,10 +93,10 @@ func initStore() (config.ConfigStore, *config.DBStore) {
 
 	slog.Info("Using file for configuration storage")
 	configPath := getEnvOrDefault("CONFIG_PATH", "config.json")
-	return config.NewStore(configPath), nil
+	return store.NewFile(configPath), nil
 }
 
-func initHub(logger *slog.Logger, dbStore *config.DBStore) *ws.Hub {
+func initHub(logger *slog.Logger, dbStore *store.Postgres) *ws.Hub {
 	var logStore ws.LogStore
 	if dbStore != nil {
 		logStore = &dbLogStore{db: dbStore}
@@ -105,7 +106,7 @@ func initHub(logger *slog.Logger, dbStore *config.DBStore) *ws.Hub {
 	return hub
 }
 
-func initSessionManager(token string, store config.ConfigStore, dbStore *config.DBStore, hub *ws.Hub, webhookNotifier *webhook.Notifier, logger *slog.Logger) *manager.SessionManager {
+func initSessionManager(token string, store config.ConfigStore, dbStore *store.Postgres, hub *ws.Hub, webhookNotifier *webhook.Notifier, logger *slog.Logger) *manager.SessionManager {
 	var sessionStore manager.SessionStore
 	if dbStore != nil {
 		sessionStore = &dbSessionStore{db: dbStore}
@@ -147,7 +148,7 @@ func waitForShutdown() {
 	<-quit
 }
 
-func shutdown(srv *http.Server, sessionMgr *manager.SessionManager, hub *ws.Hub, dbStore *config.DBStore) {
+func shutdown(srv *http.Server, sessionMgr *manager.SessionManager, hub *ws.Hub, dbStore *store.Postgres) {
 	slog.Info("Shutting down server...")
 
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
@@ -167,9 +168,9 @@ func shutdown(srv *http.Server, sessionMgr *manager.SessionManager, hub *ws.Hub,
 	slog.Info("Server stopped")
 }
 
-// dbLogStore adapts config.DBStore to ws.LogStore interface.
+// dbLogStore adapts store.Postgres to ws.LogStore interface.
 type dbLogStore struct {
-	db *config.DBStore
+	db *store.Postgres
 }
 
 func (s *dbLogStore) AddLog(level, message string) error {
@@ -182,7 +183,7 @@ func (s *dbLogStore) GetLogs(level string) ([]ws.LogEntry, error) {
 		return nil, err
 	}
 
-	// Convert config.LogEntry to ws.LogEntry
+	// Convert store.LogEntry to ws.LogEntry
 	result := make([]ws.LogEntry, len(logs))
 	for i, log := range logs {
 		result[i] = ws.LogEntry{
@@ -194,9 +195,9 @@ func (s *dbLogStore) GetLogs(level string) ([]ws.LogEntry, error) {
 	return result, nil
 }
 
-// dbSessionStore adapts config.DBStore to manager.SessionStore interface.
+// dbSessionStore adapts store.Postgres to manager.SessionStore interface.
 type dbSessionStore struct {
-	db *config.DBStore
+	db *store.Postgres
 }
 
 func (s *dbSessionStore) SaveSession(state config.SessionState) error {

@@ -1,24 +1,25 @@
-package config
+package store
 
 import (
 	"encoding/json"
 	"sync"
 	"time"
 
+	"github.com/pyyupsk/discord-stayonline/internal/config"
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
 	"gorm.io/gorm/logger"
 )
 
-// DBStore handles configuration persistence using PostgreSQL with GORM.
-type DBStore struct {
+// Postgres handles configuration persistence using PostgreSQL with GORM.
+type Postgres struct {
 	db *gorm.DB
 	mu sync.RWMutex
 }
 
-// NewDBStore creates a new database-backed configuration store.
+// NewPostgres creates a new database-backed configuration store.
 // It automatically creates the required tables if they don't exist.
-func NewDBStore(databaseURL string) (*DBStore, error) {
+func NewPostgres(databaseURL string) (*Postgres, error) {
 	db, err := gorm.Open(postgres.Open(databaseURL), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Silent),
 	})
@@ -26,7 +27,7 @@ func NewDBStore(databaseURL string) (*DBStore, error) {
 		return nil, err
 	}
 
-	store := &DBStore{db: db}
+	store := &Postgres{db: db}
 
 	// Run migrations
 	if err := store.migrate(); err != nil {
@@ -37,7 +38,7 @@ func NewDBStore(databaseURL string) (*DBStore, error) {
 }
 
 // migrate runs GORM auto-migration and handles schema evolution.
-func (s *DBStore) migrate() error {
+func (s *Postgres) migrate() error {
 	// Auto-migrate all models
 	if err := s.db.AutoMigrate(&Setting{}, &Server{}, &Log{}, &Session{}); err != nil {
 		return err
@@ -103,7 +104,7 @@ type oldConfigData struct {
 }
 
 // migrateFromOldSchema migrates data from the old JSONB configuration table.
-func (s *DBStore) migrateFromOldSchema() error {
+func (s *Postgres) migrateFromOldSchema() error {
 	if s.shouldSkipMigration() {
 		return nil
 	}
@@ -121,7 +122,7 @@ func (s *DBStore) migrateFromOldSchema() error {
 }
 
 // shouldSkipMigration checks if migration should be skipped.
-func (s *DBStore) shouldSkipMigration() bool {
+func (s *Postgres) shouldSkipMigration() bool {
 	var exists bool
 	s.db.Raw(`
 		SELECT EXISTS (
@@ -142,7 +143,7 @@ func (s *DBStore) shouldSkipMigration() bool {
 }
 
 // loadOldConfig loads and parses the old configuration.
-func (s *DBStore) loadOldConfig() (*oldConfigData, bool) {
+func (s *Postgres) loadOldConfig() (*oldConfigData, bool) {
 	var data []byte
 	result := s.db.Raw("SELECT data FROM configuration WHERE id = 1").Scan(&data)
 	if result.Error != nil || len(data) == 0 {
@@ -158,7 +159,7 @@ func (s *DBStore) loadOldConfig() (*oldConfigData, bool) {
 }
 
 // migrateSettings migrates settings from old config.
-func (s *DBStore) migrateSettings(oldConfig *oldConfigData) error {
+func (s *Postgres) migrateSettings(oldConfig *oldConfigData) error {
 	status := oldConfig.Status
 	if status == "" {
 		status = "online"
@@ -171,7 +172,7 @@ func (s *DBStore) migrateSettings(oldConfig *oldConfigData) error {
 }
 
 // migrateServers migrates servers from old config.
-func (s *DBStore) migrateServers(oldConfig *oldConfigData) error {
+func (s *Postgres) migrateServers(oldConfig *oldConfigData) error {
 	for _, srv := range oldConfig.Servers {
 		priority := max(srv.Priority, 1)
 		server := Server{
@@ -193,13 +194,13 @@ func (s *DBStore) migrateServers(oldConfig *oldConfigData) error {
 
 // Load reads the configuration from the database.
 // Returns a default configuration if no record exists.
-func (s *DBStore) Load() (*Configuration, error) {
+func (s *Postgres) Load() (*config.Configuration, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
-	cfg := &Configuration{
-		Servers: []ServerEntry{},
-		Status:  StatusOnline,
+	cfg := &config.Configuration{
+		Servers: []config.ServerEntry{},
+		Status:  config.StatusOnline,
 	}
 
 	// Load settings
@@ -208,7 +209,7 @@ func (s *DBStore) Load() (*Configuration, error) {
 		return nil, err
 	}
 	if setting.Status != "" {
-		cfg.Status = Status(setting.Status)
+		cfg.Status = config.Status(setting.Status)
 	}
 	cfg.TOSAcknowledged = setting.TOSAcknowledged
 
@@ -219,7 +220,7 @@ func (s *DBStore) Load() (*Configuration, error) {
 	}
 
 	for _, srv := range servers {
-		cfg.Servers = append(cfg.Servers, ServerEntry{
+		cfg.Servers = append(cfg.Servers, config.ServerEntry{
 			ID:             srv.ID,
 			GuildID:        srv.GuildID,
 			GuildName:      ptrToString(srv.GuildName),
@@ -252,7 +253,7 @@ func stringToPtr(s string) *string {
 
 // Save writes the configuration to the database.
 // Uses transactions for consistency across tables.
-func (s *DBStore) Save(cfg *Configuration) error {
+func (s *Postgres) Save(cfg *config.Configuration) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -280,7 +281,7 @@ func (s *DBStore) Save(cfg *Configuration) error {
 }
 
 // syncServers synchronizes servers in the database with the provided list.
-func (s *DBStore) syncServers(tx *gorm.DB, servers []ServerEntry) error {
+func (s *Postgres) syncServers(tx *gorm.DB, servers []config.ServerEntry) error {
 	// Get existing server IDs
 	var existingIDs []string
 	if err := tx.Model(&Server{}).Pluck("id", &existingIDs).Error; err != nil {
@@ -323,7 +324,7 @@ func (s *DBStore) syncServers(tx *gorm.DB, servers []ServerEntry) error {
 }
 
 // Close closes the database connection.
-func (s *DBStore) Close() error {
+func (s *Postgres) Close() error {
 	sqlDB, err := s.db.DB()
 	if err != nil {
 		return err
@@ -345,7 +346,7 @@ const MaxLogEntries = 1000
 const whereServerID = "server_id = ?"
 
 // AddLog inserts a new log entry and trims old entries if needed.
-func (s *DBStore) AddLog(level, message string) error {
+func (s *Postgres) AddLog(level, message string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -368,7 +369,7 @@ func (s *DBStore) AddLog(level, message string) error {
 
 // GetLogs retrieves log entries, optionally filtered by level.
 // Returns logs ordered from oldest to newest.
-func (s *DBStore) GetLogs(level string) ([]LogEntry, error) {
+func (s *Postgres) GetLogs(level string) ([]LogEntry, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -396,23 +397,15 @@ func (s *DBStore) GetLogs(level string) ([]LogEntry, error) {
 }
 
 // ClearLogs removes all log entries from the database.
-func (s *DBStore) ClearLogs() error {
+func (s *Postgres) ClearLogs() error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
 	return s.db.Where("1 = 1").Delete(&Log{}).Error
 }
 
-// SessionState holds Discord Gateway session data for resumption.
-type SessionState struct {
-	ServerID  string `json:"server_id"`
-	SessionID string `json:"session_id"`
-	Sequence  int    `json:"sequence"`
-	ResumeURL string `json:"resume_url"`
-}
-
 // SaveSession persists session state for later resumption.
-func (s *DBStore) SaveSession(state SessionState) error {
+func (s *Postgres) SaveSession(state config.SessionState) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -425,7 +418,7 @@ func (s *DBStore) SaveSession(state SessionState) error {
 }
 
 // LoadSession retrieves saved session state for resumption.
-func (s *DBStore) LoadSession(serverID string) (*SessionState, error) {
+func (s *Postgres) LoadSession(serverID string) (*config.SessionState, error) {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
 
@@ -437,7 +430,7 @@ func (s *DBStore) LoadSession(serverID string) (*SessionState, error) {
 		return nil, err
 	}
 
-	return &SessionState{
+	return &config.SessionState{
 		ServerID:  session.ServerID,
 		SessionID: session.SessionID,
 		Sequence:  session.Sequence,
@@ -446,7 +439,7 @@ func (s *DBStore) LoadSession(serverID string) (*SessionState, error) {
 }
 
 // DeleteSession removes session state.
-func (s *DBStore) DeleteSession(serverID string) error {
+func (s *Postgres) DeleteSession(serverID string) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 
@@ -454,7 +447,7 @@ func (s *DBStore) DeleteSession(serverID string) error {
 }
 
 // UpdateSessionSequence updates just the sequence number for a session.
-func (s *DBStore) UpdateSessionSequence(serverID string, sequence int) error {
+func (s *Postgres) UpdateSessionSequence(serverID string, sequence int) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
 

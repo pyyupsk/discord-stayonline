@@ -94,3 +94,11 @@ func Default() *Configuration {
 		TOSAcknowledged: false,
 	}
 }
+
+// SessionState holds Discord Gateway session data for resumption.
+type SessionState struct {
+	ServerID  string `json:"server_id"`
+	SessionID string `json:"session_id"`
+	Sequence  int    `json:"sequence"`
+	ResumeURL string `json:"resume_url"`
+}

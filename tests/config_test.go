@@ -9,6 +9,7 @@ import (
 	"testing"
 
 	"github.com/pyyupsk/discord-stayonline/internal/config"
+	"github.com/pyyupsk/discord-stayonline/internal/config/store"
 )
 
 const (
@@ -23,7 +24,7 @@ const (
 func TestConfigStoreLoadNonExistent(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, testConfigFile)
-	store := config.NewStore(configPath)
+	store := store.NewFile(configPath)
 
 	cfg, err := store.Load()
 	if err != nil {
@@ -36,7 +37,7 @@ func TestConfigStoreLoadNonExistent(t *testing.T) {
 func TestConfigStoreSaveAndLoad(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, testConfigFile)
-	store := config.NewStore(configPath)
+	store := store.NewFile(configPath)
 
 	cfg := createTestConfig()
 
@@ -55,7 +56,7 @@ func TestConfigStoreSaveAndLoad(t *testing.T) {
 func TestConfigStoreAtomicWrite(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, testConfigFile)
-	store := config.NewStore(configPath)
+	store := store.NewFile(configPath)
 
 	cfg := createTestConfig()
 	if err := store.Save(cfg); err != nil {
@@ -71,7 +72,7 @@ func TestConfigStoreAtomicWrite(t *testing.T) {
 func TestConfigStoreFilePermissions(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, testConfigFile)
-	store := config.NewStore(configPath)
+	store := store.NewFile(configPath)
 
 	cfg := createTestConfig()
 	if err := store.Save(cfg); err != nil {
@@ -159,7 +160,7 @@ func TestConfigStoreEmptyFile(t *testing.T) {
 		t.Fatalf("Failed to create empty file: %v", err)
 	}
 
-	store := config.NewStore(configPath)
+	store := store.NewFile(configPath)
 	cfg, err := store.Load()
 	if err != nil {
 		t.Fatalf(errLoadFormat, err)
@@ -181,7 +182,7 @@ func TestConfigStoreInvalidJSON(t *testing.T) {
 		t.Fatalf("Failed to create invalid JSON file: %v", err)
 	}
 
-	store := config.NewStore(configPath)
+	store := store.NewFile(configPath)
 	_, err := store.Load()
 	if err == nil {
 		t.Error("Load() should return error for invalid JSON")
@@ -191,7 +192,7 @@ func TestConfigStoreInvalidJSON(t *testing.T) {
 func TestConfigStoreSaveValidation(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, testConfigFile)
-	store := config.NewStore(configPath)
+	store := store.NewFile(configPath)
 
 	// Test saving config with too many servers
 	t.Run("save fails with too many servers", func(t *testing.T) {
