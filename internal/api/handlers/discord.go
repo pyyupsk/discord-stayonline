@@ -73,11 +73,7 @@ const (
 	channelTypeGuildStage = 13
 )
 
-// NewDiscordHandler creates a new Discord API handler.
 func NewDiscordHandler(logger *slog.Logger) *DiscordHandler {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &DiscordHandler{
 		token: os.Getenv("DISCORD_TOKEN"),
 		client: &http.Client{
@@ -281,9 +277,7 @@ func (h *DiscordHandler) GetBulkServerInfo(w http.ResponseWriter, r *http.Reques
 		ChannelID string `json:"channel_id"`
 	}
 
-	responses.LimitBody(r)
-	if err := json.NewDecoder(r.Body).Decode(&requests); err != nil {
-		responses.Error(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")
+	if !responses.DecodeJSON(w, r, h.logger, &requests) {
 		return
 	}
 

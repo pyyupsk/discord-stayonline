@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"time"
@@ -10,17 +9,12 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/api/responses"
 )
 
-// AuthHandler handles login/logout requests.
 type AuthHandler struct {
 	auth   *middleware.Auth
 	logger *slog.Logger
 }
 
-// NewAuthHandler creates a new auth handler.
 func NewAuthHandler(auth *middleware.Auth, logger *slog.Logger) *AuthHandler {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &AuthHandler{
 		auth:   auth,
 		logger: logger.With("handler", "auth"),
@@ -33,9 +27,7 @@ func (h *AuthHandler) Login(w http.ResponseWriter, r *http.Request) {
 		APIKey string `json:"api_key"`
 	}
 
-	responses.LimitBody(r)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		responses.Error(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")
+	if !responses.DecodeJSON(w, r, h.logger, &req) {
 		return
 	}
 

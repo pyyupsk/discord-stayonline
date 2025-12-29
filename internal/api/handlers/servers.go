@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -10,17 +9,12 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
 )
 
-// ServersHandler handles server action requests.
 type ServersHandler struct {
 	manager *manager.SessionManager
 	logger  *slog.Logger
 }
 
-// NewServersHandler creates a new servers handler.
 func NewServersHandler(mgr *manager.SessionManager, logger *slog.Logger) *ServersHandler {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &ServersHandler{
 		manager: mgr,
 		logger:  logger.With("handler", "servers"),
@@ -58,10 +52,7 @@ func (h *ServersHandler) ExecuteAction(w http.ResponseWriter, r *http.Request) {
 		Action string `json:"action"`
 	}
 
-	responses.LimitBody(r)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Error("Failed to decode request", "error", err)
-		responses.Error(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")
+	if !responses.DecodeJSON(w, r, h.logger, &req) {
 		return
 	}
 

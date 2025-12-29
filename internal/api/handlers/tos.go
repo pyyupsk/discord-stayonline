@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -9,17 +8,12 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 )
 
-// TOSHandler handles TOS acknowledgment requests.
 type TOSHandler struct {
 	store  config.ConfigStore
 	logger *slog.Logger
 }
 
-// NewTOSHandler creates a new TOS handler.
 func NewTOSHandler(store config.ConfigStore, logger *slog.Logger) *TOSHandler {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &TOSHandler{
 		store:  store,
 		logger: logger.With("handler", "tos"),
@@ -32,10 +26,7 @@ func (h *TOSHandler) AcknowledgeTOS(w http.ResponseWriter, r *http.Request) {
 		Acknowledged bool `json:"acknowledged"`
 	}
 
-	responses.LimitBody(r)
-	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.logger.Error("Failed to decode request", "error", err)
-		responses.Error(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")
+	if !responses.DecodeJSON(w, r, h.logger, &req) {
 		return
 	}
 

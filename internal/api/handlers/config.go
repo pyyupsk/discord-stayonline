@@ -1,7 +1,6 @@
 package handlers
 
 import (
-	"encoding/json"
 	"log/slog"
 	"net/http"
 
@@ -9,17 +8,12 @@ import (
 	"github.com/pyyupsk/discord-stayonline/internal/config"
 )
 
-// ConfigHandler handles configuration API requests.
 type ConfigHandler struct {
 	store  config.ConfigStore
 	logger *slog.Logger
 }
 
-// NewConfigHandler creates a new config handler.
 func NewConfigHandler(store config.ConfigStore, logger *slog.Logger) *ConfigHandler {
-	if logger == nil {
-		logger = slog.Default()
-	}
 	return &ConfigHandler{
 		store:  store,
 		logger: logger.With("handler", "config"),
@@ -34,7 +28,6 @@ func (h *ConfigHandler) GetConfig(w http.ResponseWriter, r *http.Request) {
 		responses.Error(w, http.StatusInternalServerError, "internal_error", responses.ErrLoadConfigMsg)
 		return
 	}
-
 	responses.JSON(w, http.StatusOK, cfg)
 }
 
@@ -45,10 +38,7 @@ func (h *ConfigHandler) ReplaceConfig(w http.ResponseWriter, r *http.Request) {
 		Status  config.Status        `json:"status,omitempty"`
 	}
 
-	responses.LimitBody(r)
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		h.logger.Error("Failed to decode request", "error", err)
-		responses.Error(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")
+	if !responses.DecodeJSON(w, r, h.logger, &input) {
 		return
 	}
 
@@ -89,10 +79,7 @@ func (h *ConfigHandler) UpdateConfig(w http.ResponseWriter, r *http.Request) {
 		Status  config.Status        `json:"status,omitempty"`
 	}
 
-	responses.LimitBody(r)
-	if err := json.NewDecoder(r.Body).Decode(&input); err != nil {
-		h.logger.Error("Failed to decode request", "error", err)
-		responses.Error(w, http.StatusBadRequest, "invalid_request", "Invalid JSON request body")
+	if !responses.DecodeJSON(w, r, h.logger, &input) {
 		return
 	}
 

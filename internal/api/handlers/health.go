@@ -13,7 +13,6 @@ import (
 
 var startTime = time.Now()
 
-// HealthResponse represents the health check response.
 type HealthResponse struct {
 	Status      string          `json:"status"`
 	Uptime      string          `json:"uptime"`
@@ -24,14 +23,12 @@ type HealthResponse struct {
 	Memory      MemoryInfo      `json:"memory"`
 }
 
-// ConnectionsInfo contains connection statistics.
 type ConnectionsInfo struct {
 	ActiveSessions   int               `json:"active_sessions"`
 	WebSocketClients int               `json:"websocket_clients"`
 	SessionStatuses  map[string]string `json:"session_statuses,omitempty"`
 }
 
-// RuntimeInfo contains Go runtime information.
 type RuntimeInfo struct {
 	GoVersion    string `json:"go_version"`
 	NumCPU       int    `json:"num_cpu"`
@@ -40,7 +37,6 @@ type RuntimeInfo struct {
 	GOARCH       string `json:"goarch"`
 }
 
-// MemoryInfo contains memory statistics.
 type MemoryInfo struct {
 	Alloc      string `json:"alloc"`
 	TotalAlloc string `json:"total_alloc"`
@@ -48,13 +44,11 @@ type MemoryInfo struct {
 	NumGC      uint32 `json:"num_gc"`
 }
 
-// HealthHandler handles health check requests.
 type HealthHandler struct {
 	manager *manager.SessionManager
 	hub     *ws.Hub
 }
 
-// NewHealthHandler creates a new health handler.
 func NewHealthHandler(mgr *manager.SessionManager, hub *ws.Hub) *HealthHandler {
 	return &HealthHandler{
 		manager: mgr,
