@@ -1,8 +1,7 @@
 package gateway
 
 import (
-	"crypto/rand"
-	"encoding/binary"
+	"math/rand"
 	"time"
 )
 
@@ -23,18 +22,6 @@ func CalculateBackoff(attempt int) time.Duration {
 	return delay + jitter
 }
 
-func randomJitter(delay time.Duration) time.Duration {
-	var buf [8]byte
-	if _, err := rand.Read(buf[:]); err != nil {
-		return 0
-	}
-
-	randUint := binary.BigEndian.Uint64(buf[:])
-	randFloat := float64(randUint) / float64(^uint64(0))
-	jitterNanos := randFloat * JitterFactor * float64(delay.Nanoseconds())
-	return time.Duration(jitterNanos)
-}
-
-func ResetBackoff() int {
-	return 0
+func randomJitter(d time.Duration) time.Duration {
+	return time.Duration(rand.Float64() * JitterFactor * float64(d))
 }

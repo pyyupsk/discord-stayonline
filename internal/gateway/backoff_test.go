@@ -70,13 +70,6 @@ func TestCalculateBackoffJitterVariability(t *testing.T) {
 	}
 }
 
-func TestResetBackoff(t *testing.T) {
-	result := ResetBackoff()
-	if result != 0 {
-		t.Errorf("ResetBackoff did not return 0, got %d", result)
-	}
-}
-
 func TestIsFatalCloseCode(t *testing.T) {
 	tests := []struct {
 		code      int
