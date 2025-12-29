@@ -15,6 +15,11 @@ A self-hosted service that maintains Discord account presence by managing persis
 >
 > **USE AT YOUR OWN RISK**
 
+## Deployment Warning
+
+> [!WARNING]
+> Service restarts (deployments, server reboots) will cause brief disconnections from Discord voice channels. While session resumption is attempted, Discord may invalidate sessions if the downtime exceeds ~30 seconds, resulting in a visible leave/rejoin. This may reset voice channel time counters. Plan deployments accordingly if maintaining continuous presence is important.
+
 ## Features
 
 - Maintain online/idle/dnd presence status
