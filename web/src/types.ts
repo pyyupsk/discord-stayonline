@@ -80,5 +80,6 @@ export type WebSocketMessage = {
   message?: string;
   server_id?: string;
   status?: ConnectionStatus;
+  timestamp?: string;
   type: "config_changed" | "error" | "log" | "status";
 };

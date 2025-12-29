@@ -52,14 +52,16 @@ export const useWebSocketStore = defineStore("websocket", () => {
         timestamp: string;
       }> = await response.json();
 
-      const existingMessages = new Set(logs.value.map((l) => l.message));
+      const existingTimestamps = new Set(logs.value.map((l) => l.time.getTime()));
       for (const log of serverLogs) {
-        if (!existingMessages.has(log.message)) {
+        const logTime = new Date(log.timestamp);
+        if (!existingTimestamps.has(logTime.getTime())) {
           const enriched = parseAndEnrichLogMessage(log.message, log.level);
           logs.value.push({
             ...enriched,
-            time: new Date(log.timestamp),
+            time: logTime,
           });
+          existingTimestamps.add(logTime.getTime());
         }
       }
 
@@ -73,7 +75,7 @@ export const useWebSocketStore = defineStore("websocket", () => {
   }
 
   function connect() {
-    if (ws?.readyState === WebSocket.OPEN) return;
+    if (ws?.readyState === WebSocket.OPEN || ws?.readyState === WebSocket.CONNECTING) return;
 
     wsStatus.value = "connecting";
 
@@ -120,27 +122,35 @@ export const useWebSocketStore = defineStore("websocket", () => {
   }
 
   function handleMessage(msg: WebSocketMessage) {
+    const msgTime = msg.timestamp ? new Date(msg.timestamp) : new Date();
+
     switch (msg.type) {
       case "config_changed":
         if (msg.config && onConfigChanged) {
           onConfigChanged(msg.config);
           updateServerNamesFromConfig(msg.config);
         }
-        addLogEntry({
-          action: "config",
-          level: "info",
-          message: "Configuration updated",
-        });
+        addLogEntry(
+          {
+            action: "config",
+            level: "info",
+            message: "Configuration updated",
+          },
+          msgTime,
+        );
         break;
 
       case "error":
-        addLogEntry({
-          action: "error",
-          level: "error",
-          message: msg.message || "Unknown error",
-          serverId: msg.server_id,
-          serverName: getServerName(msg.server_id),
-        });
+        addLogEntry(
+          {
+            action: "error",
+            level: "error",
+            message: msg.message || "Unknown error",
+            serverId: msg.server_id,
+            serverName: getServerName(msg.server_id),
+          },
+          msgTime,
+        );
         if (msg.server_id) {
           serverStatuses.value.set(msg.server_id, "error");
         }
@@ -148,11 +158,14 @@ export const useWebSocketStore = defineStore("websocket", () => {
 
       case "log":
         if (msg.message) {
-          addLogEntry({
-            action: "system",
-            level: (msg.level as LogEntry["level"]) || "info",
-            message: msg.message,
-          });
+          addLogEntry(
+            {
+              action: "system",
+              level: (msg.level as LogEntry["level"]) || "info",
+              message: msg.message,
+            },
+            msgTime,
+          );
         }
         break;
 
@@ -164,13 +177,16 @@ export const useWebSocketStore = defineStore("websocket", () => {
           const friendlyMessage = getFriendlyStatusMessage(msg.status, serverName, msg.message);
           const level = getLogLevelForStatus(msg.status);
 
-          addLogEntry({
-            action,
-            level,
-            message: friendlyMessage,
-            serverId: msg.server_id,
-            serverName,
-          });
+          addLogEntry(
+            {
+              action,
+              level,
+              message: friendlyMessage,
+              serverId: msg.server_id,
+              serverName,
+            },
+            msgTime,
+          );
         }
         break;
     }
@@ -204,10 +220,16 @@ export const useWebSocketStore = defineStore("websocket", () => {
     addLogEntry({ action: action || "system", level, message });
   }
 
-  function addLogEntry(entry: Omit<LogEntry, "time">) {
+  function addLogEntry(entry: Omit<LogEntry, "time">, time?: Date) {
+    const logTime = time ?? new Date();
+    const timestamp = logTime.getTime();
+
+    const isDuplicate = logs.value.some((l) => l.time.getTime() === timestamp);
+    if (isDuplicate) return;
+
     logs.value.push({
       ...entry,
-      time: new Date(),
+      time: logTime,
     });
 
     if (logs.value.length > MAX_LOG_ENTRIES) {
