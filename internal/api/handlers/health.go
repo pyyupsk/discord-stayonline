@@ -4,9 +4,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"runtime"
-	"strconv"
 	"time"
 
+	"github.com/dustin/go-humanize"
+	"github.com/hako/durafmt"
 	"github.com/pyyupsk/discord-stayonline/internal/manager"
 	"github.com/pyyupsk/discord-stayonline/internal/ws"
 )
@@ -88,7 +89,7 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 
 	response := HealthResponse{
 		Status:      "healthy",
-		Uptime:      formatDuration(uptime),
+		Uptime:      durafmt.Parse(uptime).String(),
 		UptimeSecs:  int64(uptime.Seconds()),
 		Timestamp:   time.Now().UTC().Format(time.RFC3339),
 		Connections: connInfo,
@@ -100,9 +101,9 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 			GOARCH:       runtime.GOARCH,
 		},
 		Memory: MemoryInfo{
-			Alloc:      formatBytes(memStats.Alloc),
-			TotalAlloc: formatBytes(memStats.TotalAlloc),
-			Sys:        formatBytes(memStats.Sys),
+			Alloc:      humanize.Bytes(memStats.Alloc),
+			TotalAlloc: humanize.Bytes(memStats.TotalAlloc),
+			Sys:        humanize.Bytes(memStats.Sys),
 			NumGC:      memStats.NumGC,
 		},
 	}
@@ -110,37 +111,4 @@ func (h *HealthHandler) Health(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
 	_ = json.NewEncoder(w).Encode(response)
-}
-
-func formatDuration(d time.Duration) string {
-	days := int(d.Hours()) / 24
-	hours := int(d.Hours()) % 24
-	minutes := int(d.Minutes()) % 60
-	seconds := int(d.Seconds()) % 60
-
-	if days > 0 {
-		return strconv.Itoa(days) + "d " + strconv.Itoa(hours) + "h " + strconv.Itoa(minutes) + "m " + strconv.Itoa(seconds) + "s"
-	}
-	if hours > 0 {
-		return strconv.Itoa(hours) + "h " + strconv.Itoa(minutes) + "m " + strconv.Itoa(seconds) + "s"
-	}
-	if minutes > 0 {
-		return strconv.Itoa(minutes) + "m " + strconv.Itoa(seconds) + "s"
-	}
-	return strconv.Itoa(seconds) + "s"
-}
-
-func formatBytes(b uint64) string {
-	const unit = 1024
-	if b < unit {
-		return strconv.FormatUint(b, 10) + " B"
-	}
-	div, exp := uint64(unit), 0
-	for n := b / unit; n >= unit; n /= unit {
-		div *= unit
-		exp++
-	}
-	units := []string{"KB", "MB", "GB", "TB"}
-	val := float64(b) / float64(div)
-	return strconv.FormatFloat(val, 'f', 2, 64) + " " + units[exp]
 }
